@@ -1,6 +1,5 @@
 package com.company;
 
-import java.io.Console;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -13,6 +12,18 @@ enum flag {
     Exit,
     Empty,
     Occupied
+}
+
+class DeadMoveExceptionInBackTracking extends Exception {
+    DeadMoveExceptionInBackTracking(String message) {
+        super(message);
+    }
+}
+
+class DeadMoveExceptionInAStar extends Exception {
+    DeadMoveExceptionInAStar(String message) {
+        super(message);
+    }
 }
 
 class Pair<T,V> {
@@ -49,11 +60,51 @@ class Cell {
     private int orderInBackTrack;
     private int orderInAStar;
     private boolean calculated;
+    private boolean observedByBacktrack;
     private boolean visited;
     private boolean reachable;
+    private boolean observed;
+    private boolean wasInSet;
     private Pair<Integer,Integer> coordinate;
     private Pair<Integer,Integer> prevCell;
 
+    public Cell(int first, int second) {
+        setTypeOfCell(flag.Empty);
+        calculated =  false;
+        visited = false;
+        reachable = false;
+        observed = false;
+        observedByBacktrack = false;
+        wasInSet = false;
+        this.coordinate = new Pair<>(first,second);
+        costVal = 0;
+        orderInBackTrack = 0;
+        orderInAStar = 0;
+    }
+
+    public void setObservedByBacktrack(boolean observedByBacktrack) {
+        this.observedByBacktrack = observedByBacktrack;
+    }
+
+    public boolean isObservedByBacktrack() {
+        return observedByBacktrack;
+    }
+
+    public boolean isWasInSet() {
+        return wasInSet;
+    }
+
+    public void setWasInSet(boolean wasInSet) {
+        this.wasInSet = wasInSet;
+    }
+
+    public boolean isObserved() {
+        return observed;
+    }
+
+    public void setObserved(boolean observed) {
+        this.observed = observed;
+    }
     public boolean isReachable() {
         return reachable;
     }
@@ -103,17 +154,6 @@ class Cell {
 //        this.coordinate = new Pair<>(first,second);
 //    }
 
-    public Cell(int first, int second) {
-        setTypeOfCell(flag.Empty);
-        calculated =  false;
-        visited = false;
-        reachable = false;
-        this.coordinate = new Pair<>(first,second);
-        costVal = 0;
-        orderInBackTrack = 0;
-        orderInAStar = 0;
-    }
-
     public flag getTypeOfCell() {
         return typeOfCell;
     }
@@ -155,6 +195,11 @@ class Cell {
         costVal = moveVal + heuristicVal + prevVal;
     }
 
+    public void calculateAsUnknown(int prevVal) {
+        calculated = true;
+        costVal = 1 + heuristicVal + prevVal;
+    }
+
     public int getCostVal() {
         return costVal;
     }
@@ -176,11 +221,13 @@ class Map {
     public Pair<Integer,Integer> CloakCoordinate;
     public Pair<Integer,Integer> ExitCoordinate;
     private final SortedSet<Cell> cellSet;
+    private final SortedSet<Cell> copyCellSet;
     private static final int gridSize = 9;
     public Pair<Integer,Integer> reachableBookCoordinate;
     public Pair<Integer,Integer> reachableCloakCoordinate;
     public Pair<Integer,Integer> reachableExitCoordinate;
     private boolean cloakIsActivated;
+    private boolean secondTypeOfVisionIsActivated;
 
     public Map() {
         grid = new Cell[gridSize][gridSize];
@@ -199,11 +246,30 @@ class Map {
                     return costValCompare;
             }
         });
+        copyCellSet = new TreeSet<>(new Comparator<Cell>() {
+            @Override
+            public int compare(Cell o1, Cell o2) {
+                int costValCompare = Integer.compare(o1.getCostVal(), o2.getCostVal());
+                if (costValCompare == 0)
+                    return Integer.compare(o1.hashCode(), o2.hashCode());
+                else
+                    return costValCompare;
+            }
+        });
         reachableCloakCoordinate = new Pair<>(-1,-1);
         reachableExitCoordinate = new Pair<>(-1,-1);
         reachableBookCoordinate = new Pair<>(-1,-1);
         cloakIsActivated = false;
+        secondTypeOfVisionIsActivated = false;
     }
+
+    public void setSecondTypeOfVisionIsActivated(boolean secondTypeOfVisionIsActivated) {
+        this.secondTypeOfVisionIsActivated = secondTypeOfVisionIsActivated;
+    }
+
+//    public boolean isSecondTypeOfVisionIsActivated() {
+//        return secondTypeOfVisionIsActivated;
+//    }
 
     public void activateCloak(int first, int second) {
         if (first == CloakCoordinate.getFirst() && second== CloakCoordinate.getSecond())
@@ -276,29 +342,94 @@ class Map {
         return (reachableCloakCoordinate.getFirst()!=-1 && reachableCloakCoordinate.getSecond()!=-1);
     }
 
-    private void addCellsInSet(int first, int second) {
+    private void copyForCellSets() {
+        copyCellSet.clear();
+        while (cellSet.size()!=0) {
+            copyCellSet.add(cellSet.first());
+            cellSet.remove(cellSet.first());
+        }
+        while (copyCellSet.size()!=0) {
+            cellSet.add(copyCellSet.first());
+            copyCellSet.remove(copyCellSet.first());
+        }
+    }
+
+    private void addCellsInSet(int first, int second) throws DeadMoveExceptionInAStar {
 //        System.out.println(first+" "+second);
 //        System.out.println(cellSet.first().getCoordinate().getFirst()+" "+cellSet.first().getCoordinate().getSecond());
         cellSet.remove(cellSet.first());
-        for(int i=first-1; i<first+2; i++) {
-            for(int j=second-1; j<second+2; j++) {
-                if (i>-1 && i<gridSize && j>-1 && j<gridSize && !grid[i][j].isCalculated()) {
-                    grid[i][j].calculateCostVal(grid[first][second].getCostVal());
-                    grid[i][j].setPrevCell(first,second);
-                    cellSet.add(grid[i][j]);
+//        printMap(0);
+        if (!secondTypeOfVisionIsActivated) {
+            for(int i=first-1; i<first+2; i++) {
+                for(int j=second-1; j<second+2; j++) {
+                    if (i>-1 && i<gridSize && j>-1 && j<gridSize && !grid[i][j].isCalculated()) {
+                        grid[i][j].calculateCostVal(grid[first][second].getCostVal());
+                        grid[i][j].setPrevCell(first,second);
+                        cellSet.add(grid[i][j]);
+                    }
                 }
             }
+        } else {
+            if (grid[first][second].getMoveVal()>10) {
+//                printMap(0);
+                throw new DeadMoveExceptionInAStar("Dead end for A*!!!");
+            } else {
+                for (int i = first-2; i<first+3; i++) {
+                    for (int j=second-2; j<second+3; j++) {
+                        if (i>-1 && i<gridSize && j>-1 && j<gridSize && (Math.abs(i-first)==2 || Math.abs(j-second)==2) &&
+                                (Math.abs(i-first)!=Math.abs(j-second)) && !grid[i][j].isObserved())
+                            if (!grid[i][j].isObserved()) {
+                                grid[i][j].setObserved(true);
+                                if (grid[i][j].isCalculated()) {
+                                    int f = grid[i][j].getPrevCell().getFirst();
+                                    int s = grid[i][j].getPrevCell().getSecond();
+                                    if (f != -1 && s != -1) {
+                                        if (cellSet.contains(grid[i][j])){
+                                            cellSet.remove( grid[i][j]);
+                                            grid[i][j].calculateCostVal(grid[f][s].getCostVal());
+                                            cellSet.add(grid[i][j]);
+                                        } else {
+                                            grid[i][j].calculateCostVal(grid[f][s].getCostVal());
+                                        }
+//                                        copyForCellSets();
+                                    }
+                                }
+                            }
+                    }
+                }
+                for(int i=first-1; i<first+2; i++) {
+                    for(int j=second-1; j<second+2; j++) {
+                        if (i>-1 && i<gridSize && j>-1 && j<gridSize && grid[i][j].isObserved() && !grid[i][j].isCalculated()) {
+                            grid[i][j].calculateCostVal(grid[first][second].getCostVal());
+                            grid[i][j].setPrevCell(first,second);
+//                            if (!grid[i][j].isWasInSet()){
+//                                grid[i][j].setWasInSet(true);
+                                cellSet.add(grid[i][j]);
+//                            }
+                        } else  if (i>-1 && i<gridSize && j>-1 && j<gridSize && !grid[i][j].isObserved() && !grid[i][j].isCalculated()) {
+                            grid[i][j].calculateAsUnknown(grid[first][second].getCostVal());
+                            grid[i][j].setPrevCell(first,second);
+//                            if (!grid[i][j].isWasInSet()){
+//                                grid[i][j].setWasInSet(true);
+                                cellSet.add(grid[i][j]);
+//                            }
+                        }
+                    }
+                }
+//                printMap(0);
+            }
         }
+
 //        printMap();
     }
 
-    public void findWayUsingAStar(int firstS, int secondS, int firstE, int secondE) {
+    public void findWayUsingAStar(int firstS, int secondS, int firstE, int secondE) throws DeadMoveExceptionInAStar {
         for (int i=0; i<gridSize; i++) {
             for (int j=0 ; j<gridSize; j++) {
                 grid[i][j].setHeuristicVal(Math.max( Math.abs(i-firstE),  Math.abs(j-secondE)));
             }
         }
-//        printMap();
+//        printMap(0);
         grid[firstS][secondS].calculateCostVal(0);
         grid[firstS][secondS].setPrevCell(-1,-1);
         cellSet.add(grid[firstS][secondS]);
@@ -321,21 +452,70 @@ class Map {
         }
     }
 
-    private boolean cellIsSafe(int first, int second) {
-        if (first>-1 && second>-1 && first<gridSize && second<gridSize) {
-            if (cloakIsActivated) {
-                return (grid[first][second].getTypeOfCell()!=flag.Filch
-                        && grid[first][second].getTypeOfCell()!=flag.Cat && !grid[first][second].isVisited());
+    private boolean cellIsSafe(int first, int second) throws DeadMoveExceptionInBackTracking {
+        if (!secondTypeOfVisionIsActivated) {
+            if (first>-1 && second>-1 && first<gridSize && second<gridSize) {
+                if (cloakIsActivated) {
+                    return (grid[first][second].getTypeOfCell()!=flag.Filch
+                            && grid[first][second].getTypeOfCell()!=flag.Cat && !grid[first][second].isVisited());
+                } else {
+                    return (grid[first][second].getTypeOfCell() != flag.Occupied && grid[first][second].getTypeOfCell()!=flag.Filch
+                            && grid[first][second].getTypeOfCell()!=flag.Cat && !grid[first][second].isVisited());
+                }
             } else {
-                return (grid[first][second].getTypeOfCell() != flag.Occupied && grid[first][second].getTypeOfCell()!=flag.Filch
-                        && grid[first][second].getTypeOfCell()!=flag.Cat && !grid[first][second].isVisited());
+                return false;
             }
         } else {
-            return false;
+            for (int i = first-2; i<first+3; i++) {
+                for (int j=second-2; j<second+3; j++) {
+                    if (i>-1 && i<gridSize && j>-1 && j<gridSize && (Math.abs(i-first)==2 || Math.abs(j-second)==2) &&
+                            (Math.abs(i-first)!=Math.abs(j-second)) && !grid[i][j].isObservedByBacktrack()) {
+                        grid[i][j].setObservedByBacktrack(true);
+                    }
+                }
+            }
+            if (first>-1 && second>-1 && first<gridSize && second<gridSize && grid[first][second].isObservedByBacktrack()) {
+                if (cloakIsActivated) {
+                    return (grid[first][second].getTypeOfCell()!=flag.Filch
+                            && grid[first][second].getTypeOfCell()!=flag.Cat && !grid[first][second].isVisited());
+                } else {
+                    return (grid[first][second].getTypeOfCell() != flag.Occupied && grid[first][second].getTypeOfCell()!=flag.Filch
+                            && grid[first][second].getTypeOfCell()!=flag.Cat && !grid[first][second].isVisited());
+                }
+            } else if (first>-1 && second>-1 && first<gridSize && second<gridSize && !grid[first][second].isObservedByBacktrack()) {
+                if (cloakIsActivated) {
+                    if (grid[first][second].getTypeOfCell()==flag.Filch
+                            || grid[first][second].getTypeOfCell()==flag.Cat) {
+                        throw new DeadMoveExceptionInBackTracking("Dead end in backtrack algorithm!");
+                    } else {
+                        return (grid[first][second].getTypeOfCell()!=flag.Filch
+                                && grid[first][second].getTypeOfCell()!=flag.Cat && !grid[first][second].isVisited());
+                    }
+                } else {
+                    if (grid[first][second].getTypeOfCell() == flag.Occupied) {
+                        throw new DeadMoveExceptionInBackTracking("Dead end in backtrack algorithm!");
+                    } else {
+                        return (grid[first][second].getTypeOfCell() != flag.Occupied && grid[first][second].getTypeOfCell()!=flag.Filch
+                                && grid[first][second].getTypeOfCell()!=flag.Cat && !grid[first][second].isVisited());
+                    }
+                }
+            } else {
+                return false;
+            }
         }
     }
 
-    public boolean findWayUsingBacktracking(int firstS, int secondS, int firstE, int secondE, int orderInBacktrack) {
+    public boolean findWayUsingBacktracking(int firstS, int secondS, int firstE, int secondE, int orderInBacktrack) throws DeadMoveExceptionInBackTracking {
+        if (orderInBacktrack==0 && secondTypeOfVisionIsActivated) {
+            for (int i = firstS-2; i<firstS+3; i++) {
+                for (int j=secondS-2; j<secondS+3; j++) {
+                    if (i>-1 && i<gridSize && j>-1 && j<gridSize && (Math.abs(i-firstS)==2 || Math.abs(j-secondS)==2) &&
+                            (Math.abs(i-firstS)!=Math.abs(j-secondS)) && !grid[i][j].isObservedByBacktrack()) {
+                        grid[i][j].setObservedByBacktrack(true);
+                    }
+                }
+            }
+        }
         orderInBacktrack++;
         if (firstS==firstE && secondS == secondE) {
             grid[firstS][secondS].setOrderInBackTrack(orderInBacktrack);
@@ -411,6 +591,7 @@ class Map {
                                 findWayUsingBacktracking(firstS+verticalMove.get(i),secondS+horizontalMove.get(j), firstE, secondE, orderInBacktrack)) {
                             grid[firstS][secondS].setOrderInBackTrack(orderInBacktrack);
 //                            System.out.println(firstS + " " + secondS);
+//                            printMap(0);
                             return true;
                         }
                 }
@@ -559,13 +740,23 @@ class Map {
                 ExitCoordinate.getFirst(), ExitCoordinate.getSecond());
         if (cloakIsActivated)
             someMap.activateCloak(CloakCoordinate.getFirst(), CloakCoordinate.getSecond());
+        someMap.setSecondTypeOfVisionIsActivated(secondTypeOfVisionIsActivated);
+    }
+
+    public void copyAllObserved(Map someMap) {
+        for (int i=0; i<gridSize; i++) {
+            for (int j=0; j<gridSize; j++) {
+                grid[i][j].setObserved(someMap.grid[i][j].isObserved());
+                grid[i][j].setObservedByBacktrack(someMap.grid[i][j].isObservedByBacktrack());
+            }
+        }
     }
 
     public void printMap(int style) {
         System.out.println("-------------------------------------------------------------------------");
         if (style == 0) {
             for (int i=gridSize-1; i>-1; i--) {
-                for (int k=0; k<5; k++) {
+                for (int k=0; k<6; k++) {
                     for (int j=0; j<gridSize; j++) {
                         System.out.print('|');
                         if (grid[i][j].getTypeOfCell()==flag.Harry && k==0) {
@@ -613,6 +804,12 @@ class Map {
                         } else if (k==4) {
                             if (grid[i][j].isReachable()) {
                                 System.out.print("\u001B[36m"+"R  "+"\u001B[0m");
+                            } else {
+                                System.out.print("   ");
+                            }
+                        } else if (k==5) {
+                            if (grid[i][j].isObservedByBacktrack()) {
+                                System.out.print("\u001B[36m"+"Ob "+"\u001B[0m");
                             } else {
                                 System.out.print("   ");
                             }
@@ -723,21 +920,52 @@ class Map {
 
 public class Main {
 
-    public static void calculateWayBE(Map map1, Map map2, AtomicInteger numberOfStepsInBacktrack, AtomicInteger numberOfStepsInAStar) {
+    public static void calculateWayBE_Backtrack(Map map1, Map map2, AtomicInteger numberOfStepsInBacktrack) throws DeadMoveExceptionInBackTracking {
+        map1.checkAllReachable(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond());
+        map1.findWayUsingBacktracking(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
+                map1.reachableBookCoordinate.getFirst(), map1.reachableBookCoordinate.getSecond(),0);
+        map2.copyAllObserved(map1);
+        map2.checkAllReachable(map2.HarryCoordinate.getFirst(), map2.HarryCoordinate.getSecond());
+        map2.findWayUsingBacktracking(map2.reachableBookCoordinate.getFirst(), map2.reachableBookCoordinate.getSecond(),
+                map2.reachableExitCoordinate.getFirst(), map2.reachableExitCoordinate.getSecond(),0);
+
+        int fp1 = map1.reachableBookCoordinate.getFirst();
+        int sp1 = map1.reachableBookCoordinate.getSecond();
+        int fp2 = map2.reachableExitCoordinate.getFirst();
+        int sp2 = map2.reachableExitCoordinate.getSecond();
+        numberOfStepsInBacktrack.set(map1.getCell(fp1,sp1).getOrderInBackTrack()-1 +
+                map2.getCell(fp2,sp2).getOrderInBackTrack()-1);
+    }
+
+    public static void calculateWayBE_AStar(Map map1, Map map2, AtomicInteger numberOfStepsInAStar) throws DeadMoveExceptionInAStar {
+        map1.checkAllReachable(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond());
+        map1.findWayUsingAStar(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
+                map1.reachableBookCoordinate.getFirst(), map1.reachableBookCoordinate.getSecond());
+        map2.copyAllObserved(map1);
+        map2.checkAllReachable(map2.HarryCoordinate.getFirst(), map2.HarryCoordinate.getSecond());
+        map2.findWayUsingAStar(map2.reachableBookCoordinate.getFirst(), map2.reachableBookCoordinate.getSecond(),
+                map2.reachableExitCoordinate.getFirst(), map2.reachableExitCoordinate.getSecond());
+
+        int fp1 = map1.reachableBookCoordinate.getFirst();
+        int sp1 = map1.reachableBookCoordinate.getSecond();
+        int fp2 = map2.reachableExitCoordinate.getFirst();
+        int sp2 = map2.reachableExitCoordinate.getSecond();
+        numberOfStepsInAStar.set(map1.getCell(fp1,sp1).getOrderInAStar()-1 +
+                map2.getCell(fp2,sp2).getOrderInAStar()-1);
+    }
+
+    public static void calculateWayBE(Map map1, Map map2, AtomicInteger numberOfStepsInBacktrack, AtomicInteger numberOfStepsInAStar) throws DeadMoveExceptionInBackTracking, DeadMoveExceptionInAStar {
         map1.checkAllReachable(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond());
         map1.findWayUsingAStar(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
                 map1.reachableBookCoordinate.getFirst(), map1.reachableBookCoordinate.getSecond());
         map1.findWayUsingBacktracking(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
                 map1.reachableBookCoordinate.getFirst(), map1.reachableBookCoordinate.getSecond(),0);
-//        map1.printMap();
 
         map2.checkAllReachable(map2.HarryCoordinate.getFirst(), map2.HarryCoordinate.getSecond());
         map2.findWayUsingAStar(map2.reachableBookCoordinate.getFirst(), map2.reachableBookCoordinate.getSecond(),
                 map2.reachableExitCoordinate.getFirst(), map2.reachableExitCoordinate.getSecond());
         map2.findWayUsingBacktracking(map2.reachableBookCoordinate.getFirst(), map2.reachableBookCoordinate.getSecond(),
                 map2.reachableExitCoordinate.getFirst(), map2.reachableExitCoordinate.getSecond(),0);
-//        map2.printMap();
-
         int fp1 = map1.reachableBookCoordinate.getFirst();
         int sp1 = map1.reachableBookCoordinate.getSecond();
         int fp2 = map2.reachableExitCoordinate.getFirst();
@@ -748,7 +976,57 @@ public class Main {
                 map2.getCell(fp2,sp2).getOrderInAStar()-1);
     }
 
-    public static void calculateWayBCE(Map map1, Map map2, Map map3, AtomicInteger numberOfStepsInBacktrack, AtomicInteger numberOfStepsInAStar) {
+    public static void calculateWayBCE_Backtrack(Map map1, Map map2, Map map3, AtomicInteger numberOfStepsInBacktrack) throws DeadMoveExceptionInBackTracking {
+        map1.checkAllReachable(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond());
+        map1.findWayUsingBacktracking(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
+                map1.reachableBookCoordinate.getFirst(), map1.reachableBookCoordinate.getSecond(),0);
+        map2.copyAllObserved(map1);
+        map2.checkAllReachable(map2.HarryCoordinate.getFirst(), map2.HarryCoordinate.getSecond());
+        map2.findWayUsingBacktracking(map2.reachableBookCoordinate.getFirst(), map2.reachableBookCoordinate.getSecond(),
+                map2.reachableCloakCoordinate.getFirst(), map2.reachableCloakCoordinate.getSecond(),0);
+        map3.copyAllObserved(map2);
+        map3.activateCloak(map2.reachableCloakCoordinate.getFirst(), map2.reachableCloakCoordinate.getSecond());
+        map3.checkAllReachable(map3.HarryCoordinate.getFirst(), map3.HarryCoordinate.getSecond());
+        map3.findWayUsingBacktracking(map3.reachableCloakCoordinate.getFirst(), map3.reachableCloakCoordinate.getSecond(),
+                map3.reachableExitCoordinate.getFirst(), map3.reachableExitCoordinate.getSecond(),0);
+
+        int fp1 = map1.reachableBookCoordinate.getFirst();
+        int sp1 = map1.reachableBookCoordinate.getSecond();
+        int fp2 = map2.reachableCloakCoordinate.getFirst();
+        int sp2 = map2.reachableCloakCoordinate.getSecond();
+        int fp3 = map3.reachableExitCoordinate.getFirst();
+        int sp3 = map3.reachableExitCoordinate.getSecond();
+        numberOfStepsInBacktrack.set(map1.getCell(fp1,sp1).getOrderInBackTrack()-1 +
+                map2.getCell(fp2,sp2).getOrderInBackTrack()-1 +
+                map3.getCell(fp3,sp3).getOrderInBackTrack()-1);
+    }
+
+    public static void calculateWayBCE_AStar(Map map1, Map map2, Map map3, AtomicInteger numberOfStepsInAStar) throws DeadMoveExceptionInAStar {
+        map1.checkAllReachable(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond());
+        map1.findWayUsingAStar(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
+                map1.reachableBookCoordinate.getFirst(), map1.reachableBookCoordinate.getSecond());
+        map2.copyAllObserved(map1);
+        map2.checkAllReachable(map2.HarryCoordinate.getFirst(), map2.HarryCoordinate.getSecond());
+        map2.findWayUsingAStar(map2.reachableBookCoordinate.getFirst(), map2.reachableBookCoordinate.getSecond(),
+                map2.reachableCloakCoordinate.getFirst(), map2.reachableCloakCoordinate.getSecond());
+        map3.copyAllObserved(map2);
+        map3.activateCloak(map2.reachableCloakCoordinate.getFirst(), map2.reachableCloakCoordinate.getSecond());
+        map3.checkAllReachable(map3.HarryCoordinate.getFirst(), map3.HarryCoordinate.getSecond());
+        map3.findWayUsingAStar(map3.reachableCloakCoordinate.getFirst(), map3.reachableCloakCoordinate.getSecond(),
+                map3.reachableExitCoordinate.getFirst(), map3.reachableExitCoordinate.getSecond());
+
+        int fp1 = map1.reachableBookCoordinate.getFirst();
+        int sp1 = map1.reachableBookCoordinate.getSecond();
+        int fp2 = map2.reachableCloakCoordinate.getFirst();
+        int sp2 = map2.reachableCloakCoordinate.getSecond();
+        int fp3 = map3.reachableExitCoordinate.getFirst();
+        int sp3 = map3.reachableExitCoordinate.getSecond();
+        numberOfStepsInAStar.set(map1.getCell(fp1,sp1).getOrderInAStar()-1 +
+                map2.getCell(fp2,sp2).getOrderInAStar()-1 +
+                map3.getCell(fp3,sp3).getOrderInAStar()-1);
+    }
+
+    public static void calculateWayBCE(Map map1, Map map2, Map map3, AtomicInteger numberOfStepsInBacktrack, AtomicInteger numberOfStepsInAStar) throws DeadMoveExceptionInBackTracking, DeadMoveExceptionInAStar {
         map1.checkAllReachable(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond());
         map1.findWayUsingAStar(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
                 map1.reachableBookCoordinate.getFirst(), map1.reachableBookCoordinate.getSecond());
@@ -782,13 +1060,64 @@ public class Main {
                 map3.getCell(fp3,sp3).getOrderInAStar()-1);
     }
 
-    public static void calculateWayCBE(Map map1, Map map2, Map map3, AtomicInteger numberOfStepsInBacktrack, AtomicInteger numberOfStepsInAStar) {
+    public static void calculateWayCBE_Backtrack(Map map1, Map map2, Map map3, AtomicInteger numberOfStepsInBacktrack) throws DeadMoveExceptionInBackTracking {
+        map1.checkAllReachable(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond());
+        map1.findWayUsingBacktracking(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
+                map1.reachableCloakCoordinate.getFirst(), map1.reachableCloakCoordinate.getSecond(),0);
+        map2.copyAllObserved(map1);
+        map2.activateCloak(map1.reachableCloakCoordinate.getFirst(), map1.reachableCloakCoordinate.getSecond());
+        map2.checkAllReachable(map2.HarryCoordinate.getFirst(), map2.HarryCoordinate.getSecond());
+        map2.findWayUsingBacktracking(map2.reachableCloakCoordinate.getFirst(), map2.reachableCloakCoordinate.getSecond(),
+                map2.reachableBookCoordinate.getFirst(), map2.reachableBookCoordinate.getSecond(),0);
+        map3.copyAllObserved(map2);
+        map3.activateCloak(map2.reachableCloakCoordinate.getFirst(), map2.reachableCloakCoordinate.getSecond());
+        map3.checkAllReachable(map3.HarryCoordinate.getFirst(), map3.HarryCoordinate.getSecond());
+        map3.findWayUsingBacktracking(map3.reachableBookCoordinate.getFirst(), map3.reachableBookCoordinate.getSecond(),
+                map3.reachableExitCoordinate.getFirst(), map3.reachableExitCoordinate.getSecond(),0);
+
+        int fp1 = map1.reachableCloakCoordinate.getFirst();
+        int sp1 = map1.reachableCloakCoordinate.getSecond();
+        int fp2 = map2.reachableBookCoordinate.getFirst();
+        int sp2 = map2.reachableBookCoordinate.getSecond();
+        int fp3 = map3.reachableExitCoordinate.getFirst();
+        int sp3 = map3.reachableExitCoordinate.getSecond();
+        numberOfStepsInBacktrack.set(map1.getCell(fp1,sp1).getOrderInBackTrack()-1 +
+                map2.getCell(fp2,sp2).getOrderInBackTrack()-1 +
+                map3.getCell(fp3,sp3).getOrderInBackTrack()-1);
+    }
+
+    public static void calculateWayCBE_AStar(Map map1, Map map2, Map map3, AtomicInteger numberOfStepsInAStar) throws  DeadMoveExceptionInAStar {
+        map1.checkAllReachable(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond());
+        map1.findWayUsingAStar(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
+                map1.reachableCloakCoordinate.getFirst(), map1.reachableCloakCoordinate.getSecond());
+        map2.copyAllObserved(map1);
+        map2.activateCloak(map1.reachableCloakCoordinate.getFirst(), map1.reachableCloakCoordinate.getSecond());
+        map2.checkAllReachable(map2.HarryCoordinate.getFirst(), map2.HarryCoordinate.getSecond());
+        map2.findWayUsingAStar(map2.reachableCloakCoordinate.getFirst(), map2.reachableCloakCoordinate.getSecond(),
+                map2.reachableBookCoordinate.getFirst(), map2.reachableBookCoordinate.getSecond());
+        map3.copyAllObserved(map2);
+        map3.activateCloak(map2.reachableCloakCoordinate.getFirst(), map2.reachableCloakCoordinate.getSecond());
+        map3.checkAllReachable(map3.HarryCoordinate.getFirst(), map3.HarryCoordinate.getSecond());
+        map3.findWayUsingAStar(map3.reachableBookCoordinate.getFirst(), map3.reachableBookCoordinate.getSecond(),
+                map3.reachableExitCoordinate.getFirst(), map3.reachableExitCoordinate.getSecond());
+
+        int fp1 = map1.reachableCloakCoordinate.getFirst();
+        int sp1 = map1.reachableCloakCoordinate.getSecond();
+        int fp2 = map2.reachableBookCoordinate.getFirst();
+        int sp2 = map2.reachableBookCoordinate.getSecond();
+        int fp3 = map3.reachableExitCoordinate.getFirst();
+        int sp3 = map3.reachableExitCoordinate.getSecond();
+        numberOfStepsInAStar.set(map1.getCell(fp1,sp1).getOrderInAStar()-1 +
+                map2.getCell(fp2,sp2).getOrderInAStar()-1 +
+                map3.getCell(fp3,sp3).getOrderInAStar()-1);
+    }
+
+    public static void calculateWayCBE(Map map1, Map map2, Map map3, AtomicInteger numberOfStepsInBacktrack, AtomicInteger numberOfStepsInAStar) throws DeadMoveExceptionInBackTracking, DeadMoveExceptionInAStar {
         map1.checkAllReachable(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond());
         map1.findWayUsingAStar(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
                 map1.reachableCloakCoordinate.getFirst(), map1.reachableCloakCoordinate.getSecond());
         map1.findWayUsingBacktracking(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
                 map1.reachableCloakCoordinate.getFirst(), map1.reachableCloakCoordinate.getSecond(),0);
-//        map1.printMap();
 
         map2.activateCloak(map1.reachableCloakCoordinate.getFirst(), map1.reachableCloakCoordinate.getSecond());
         map2.checkAllReachable(map2.HarryCoordinate.getFirst(), map2.HarryCoordinate.getSecond());
@@ -796,7 +1125,6 @@ public class Main {
                 map2.reachableBookCoordinate.getFirst(), map2.reachableBookCoordinate.getSecond());
         map2.findWayUsingBacktracking(map2.reachableCloakCoordinate.getFirst(), map2.reachableCloakCoordinate.getSecond(),
                 map2.reachableBookCoordinate.getFirst(), map2.reachableBookCoordinate.getSecond(),0);
-//        map2.printMap();
 
         map3.activateCloak(map2.reachableCloakCoordinate.getFirst(), map2.reachableCloakCoordinate.getSecond());
         map3.checkAllReachable(map3.HarryCoordinate.getFirst(), map3.HarryCoordinate.getSecond());
@@ -804,7 +1132,6 @@ public class Main {
                 map3.reachableExitCoordinate.getFirst(), map3.reachableExitCoordinate.getSecond());
         map3.findWayUsingBacktracking(map3.reachableBookCoordinate.getFirst(), map3.reachableBookCoordinate.getSecond(),
                 map3.reachableExitCoordinate.getFirst(), map3.reachableExitCoordinate.getSecond(),0);
-//        map3.printMap();
 
         int fp1 = map1.reachableCloakCoordinate.getFirst();
         int sp1 = map1.reachableCloakCoordinate.getSecond();
@@ -820,7 +1147,290 @@ public class Main {
                 map3.getCell(fp3,sp3).getOrderInAStar()-1);
     }
 
-    public static void analyzeAllPossibleOutcomes(Map map) {
+    public static void analyzeAllPossibleOutcomes_Backtrack(Map map, int scenario) throws DeadMoveExceptionInBackTracking {
+        if (scenario==2)
+            map.setSecondTypeOfVisionIsActivated(true);
+        boolean usedBE = false;
+        boolean usedCBE = false;
+        boolean usedBCE = false;
+        AtomicInteger numberOfStepsInBacktrackingBE = new AtomicInteger();
+        AtomicInteger numberOfStepsInBacktrackingCBE = new AtomicInteger();
+        AtomicInteger numberOfStepsInBacktrackingBCE = new AtomicInteger();
+        Map map1 = new Map();
+        Map map2 = new Map();
+        Map map3 = new Map();
+        Map map4 = new Map();
+        Map map5 = new Map();
+        Map map6 = new Map();
+        Map map7 = new Map();
+        Map map8 = new Map();
+        map.copyMap(map1);
+        map.copyMap(map2);
+        map.copyMap(map3);
+        map.copyMap(map4);
+        map.copyMap(map5);
+        map.copyMap(map6);
+        map.copyMap(map7);
+        map.copyMap(map8);
+        map.checkAllReachable(map.HarryCoordinate.getFirst(), map.HarryCoordinate.getSecond());
+        if (map.isBookReachable()) {
+            if (map.isExitReachable()) {
+                if (map.isCloakReachable()) {//BCE BE CBE
+                    //BE
+                    calculateWayBE_Backtrack(map1, map2, numberOfStepsInBacktrackingBE);
+                    usedBE = true;
+
+                    //BCE
+                    calculateWayBCE_Backtrack(map3, map4, map5, numberOfStepsInBacktrackingBCE);
+                    usedBCE = true;
+
+                    //CBE
+                    calculateWayCBE_Backtrack(map6, map7, map8, numberOfStepsInBacktrackingCBE);
+                    usedCBE = true;
+
+                } else {//BE
+                    //BE
+                    calculateWayBE_Backtrack(map1, map2, numberOfStepsInBacktrackingBE);
+                    usedBE = true;
+
+                }
+            } else {
+                if (map.isCloakReachable()) {
+                    map.activateCloak(map.reachableCloakCoordinate.getFirst(), map.reachableCloakCoordinate.getSecond());
+                    map.resetAllReachable();
+                    map.checkAllReachable(map.HarryCoordinate.getFirst(), map.HarryCoordinate.getSecond());
+                    if (map.isExitReachable()) {//BCE CBE
+                        //BCE
+                        calculateWayBCE_Backtrack(map3, map4, map5, numberOfStepsInBacktrackingBCE);
+                        usedBCE = true;
+
+                        //CBE
+                        calculateWayCBE_Backtrack(map6, map7, map8, numberOfStepsInBacktrackingCBE);
+                        usedCBE = true;
+
+                    } else {
+                        System.out.println("You Lose!");
+                    }
+                } else {
+                    System.out.println("You Lose!");
+                }
+            }
+        } else if (map.isCloakReachable()) {
+            map.activateCloak(map.reachableCloakCoordinate.getFirst(), map.reachableCloakCoordinate.getSecond());
+            map.resetAllReachable();
+            map.checkAllReachable(map.HarryCoordinate.getFirst(), map.HarryCoordinate.getSecond());
+            if (map.isBookReachable()) {
+
+                if (map.isExitReachable()) {//CBE
+                    //CBE
+                    calculateWayCBE_Backtrack(map6, map7, map8, numberOfStepsInBacktrackingCBE);
+                    usedCBE = true;
+
+                } else {
+                    System.out.println("You Lose!");
+                }
+            } else {
+                System.out.println("You Lose!");
+            }
+        } else {
+            System.out.println("You Lose!");
+        }
+
+        if (usedBCE || usedBE || usedCBE) {
+//            System.out.println(numberOfStepsInBacktrackingBE);
+//            System.out.println(numberOfStepsInBacktrackingBCE);
+//            System.out.println(numberOfStepsInBacktrackingCBE);
+            int numOfStepsInBacktrackingBE = numberOfStepsInBacktrackingBE.get();
+            int numOfStepsInBacktrackingBCE = numberOfStepsInBacktrackingBCE.get();
+            int numOfStepsInBacktrackingCBE = numberOfStepsInBacktrackingCBE.get();
+
+            ArrayList<Integer> bestForBacktracking = new ArrayList<>();
+            bestForBacktracking.add(numOfStepsInBacktrackingBE);
+            bestForBacktracking.add(numOfStepsInBacktrackingBCE);
+            bestForBacktracking.add(numOfStepsInBacktrackingCBE);
+            int minBacktrackingVal = 100000;
+            int minBacktrackingInd = -1;
+            for (int i=0; i<bestForBacktracking.size(); i++) {
+                if (bestForBacktracking.get(i)<minBacktrackingVal && bestForBacktracking.get(i)!=0) {
+                    minBacktrackingVal = bestForBacktracking.get(i);
+                    minBacktrackingInd = i;
+                }
+            }
+
+            if (scenario==2) {
+                System.out.println("The shortest way using the Backtracking algorithm with 2nd type of perception takes "+ minBacktrackingVal +" steps.");
+            } else {
+                System.out.println("The shortest way using the Backtracking algorithm with 1st type of perception takes "+ minBacktrackingVal +" steps.");
+            }
+            if (minBacktrackingInd == 0) {
+                System.out.println("Path would be Harry -- Book -- Exit:");
+                System.out.println("Harry -> Book:");
+                map1.printMap(1);
+                System.out.println("Book -> Exit:");
+                map2.printMap(1);
+            } else if (minBacktrackingInd == 1){
+                System.out.println("Path would be Harry -- Book -- Invisible Cloak -- Exit:");
+                System.out.println("Harry -> Book:");
+                map3.printMap(1);
+                System.out.println("Book -> Invisible Cloak:");
+                map4.printMap(1);
+                System.out.println("Invisible Cloak -> Exit:");
+                map5.printMap(1);
+            } else {
+                System.out.println("Path would be Harry -- Invisible Cloak -- Book  -- Exit:");
+                System.out.println("Harry -> Invisible Cloak:");
+                map6.printMap(1);
+                System.out.println("Invisible Cloak -> Book:");
+                map7.printMap(1);
+                System.out.println("Book -> Exit:");
+                map8.printMap(1);
+            }
+        }
+    }
+
+    public static void analyzeAllPossibleOutcomes_AStar(Map map, int scenario) throws DeadMoveExceptionInAStar {
+        if (scenario==2)
+            map.setSecondTypeOfVisionIsActivated(true);
+        boolean usedBE = false;
+        boolean usedCBE = false;
+        boolean usedBCE = false;
+        AtomicInteger numberOfStepsInAStarBE = new AtomicInteger();
+        AtomicInteger numberOfStepsInAStarCBE = new AtomicInteger();
+        AtomicInteger numberOfStepsInAStarBCE = new AtomicInteger();
+        Map map1 = new Map();
+        Map map2 = new Map();
+        Map map3 = new Map();
+        Map map4 = new Map();
+        Map map5 = new Map();
+        Map map6 = new Map();
+        Map map7 = new Map();
+        Map map8 = new Map();
+        map.copyMap(map1);
+        map.copyMap(map2);
+        map.copyMap(map3);
+        map.copyMap(map4);
+        map.copyMap(map5);
+        map.copyMap(map6);
+        map.copyMap(map7);
+        map.copyMap(map8);
+        map.checkAllReachable(map.HarryCoordinate.getFirst(), map.HarryCoordinate.getSecond());
+        if (map.isBookReachable()) {
+            if (map.isExitReachable()) {
+                if (map.isCloakReachable()) {//BCE BE CBE
+                    //BE
+                    calculateWayBE_AStar(map1, map2, numberOfStepsInAStarBE);
+                    usedBE = true;
+
+                    //BCE
+                    calculateWayBCE_AStar(map3, map4, map5, numberOfStepsInAStarBCE);
+                    usedBCE = true;
+
+                    //CBE
+                    calculateWayCBE_AStar(map6, map7, map8, numberOfStepsInAStarCBE);
+                    usedCBE = true;
+
+                } else {//BE
+                    //BE
+                    calculateWayBE_AStar(map1, map2, numberOfStepsInAStarBE);
+                    usedBE = true;
+
+                }
+            } else {
+                if (map.isCloakReachable()) {
+                    map.activateCloak(map.reachableCloakCoordinate.getFirst(), map.reachableCloakCoordinate.getSecond());
+                    map.resetAllReachable();
+                    map.checkAllReachable(map.HarryCoordinate.getFirst(), map.HarryCoordinate.getSecond());
+                    if (map.isExitReachable()) {//BCE CBE
+                        //BCE
+                        calculateWayBCE_AStar(map3, map4, map5,numberOfStepsInAStarBCE);
+                        usedBCE = true;
+
+                        //CBE
+                        calculateWayCBE_AStar(map6, map7, map8, numberOfStepsInAStarCBE);
+                        usedCBE = true;
+
+                    } else {
+                        System.out.println("You Lose!");
+                    }
+                } else {
+                    System.out.println("You Lose!");
+                }
+            }
+        } else if (map.isCloakReachable()) {
+            map.activateCloak(map.reachableCloakCoordinate.getFirst(), map.reachableCloakCoordinate.getSecond());
+            map.resetAllReachable();
+            map.checkAllReachable(map.HarryCoordinate.getFirst(), map.HarryCoordinate.getSecond());
+            if (map.isBookReachable()) {
+
+                if (map.isExitReachable()) {//CBE
+                    //CBE
+                    calculateWayCBE_AStar(map6, map7, map8, numberOfStepsInAStarCBE);
+                    usedCBE = true;
+
+                } else {
+                    System.out.println("You Lose!");
+                }
+            } else {
+                System.out.println("You Lose!");
+            }
+        } else {
+            System.out.println("You Lose!");
+        }
+
+        if (usedBCE || usedBE || usedCBE) {
+//            System.out.println(numberOfStepsInAStarBE);
+//            System.out.println(numberOfStepsInAStarBCE);
+//            System.out.println(numberOfStepsInAStarCBE);
+            int numOfStepsInAStarBE = numberOfStepsInAStarBE.get();
+            int numOfStepsInAStarBCE = numberOfStepsInAStarBCE.get();
+            int numOfStepsInAStarCBE = numberOfStepsInAStarCBE.get();
+
+            ArrayList<Integer> bestForAStar = new ArrayList<>();
+            bestForAStar.add(numOfStepsInAStarBE);
+            bestForAStar.add(numOfStepsInAStarBCE);
+            bestForAStar.add(numOfStepsInAStarCBE);
+            int minAStarVal = 100000;
+            int minAStarInd = -1;
+            for (int i=0; i<bestForAStar.size(); i++) {
+                if (bestForAStar.get(i)<minAStarVal && bestForAStar.get(i)!=0) {
+                    minAStarVal = bestForAStar.get(i);
+                    minAStarInd = i;
+                }
+            }
+            if (scenario==2) {
+                System.out.println("The shortest way using the A* algorithm with 2nd type of perception takes "+ minAStarVal +" steps.");
+            } else {
+                System.out.println("The shortest way using the A* algorithm with 1st type of perception takes "+ minAStarVal +" steps.");
+            }
+            if (minAStarInd == 0) {
+                System.out.println("Path would be Harry -- Book -- Exit:");
+                System.out.println("Harry -> Book:");
+                map1.printMap(2);
+                System.out.println("Book -> Exit:");
+                map2.printMap(2);
+            } else if (minAStarInd == 1){
+                System.out.println("Path would be Harry -- Book -- Invisible Cloak -- Exit:");
+                System.out.println("Harry -> Book:");
+                map3.printMap(2);
+                System.out.println("Book -> Invisible Cloak:");
+                map4.printMap(2);
+                System.out.println("Invisible Cloak -> Exit:");
+                map5.printMap(2);
+            } else {
+                System.out.println("Path would be Harry -- Invisible Cloak -- Book  -- Exit:");
+                System.out.println("Harry -> Invisible Cloak:");
+                map6.printMap(2);
+                System.out.println("Invisible Cloak -> Book:");
+                map7.printMap(2);
+                System.out.println("Book -> Exit:");
+                map8.printMap(2);
+            }
+        }
+    }
+
+    public static void analyzeAllPossibleOutcomes(Map map, int scenario) throws DeadMoveExceptionInBackTracking, DeadMoveExceptionInAStar {
+        if (scenario==2)
+            map.setSecondTypeOfVisionIsActivated(true);
         boolean usedBE = false;
         boolean usedCBE = false;
         boolean usedBCE = false;
@@ -911,9 +1521,9 @@ public class Main {
         }
 
         if (usedBCE || usedBE || usedCBE) {
-            System.out.println(numberOfStepsInAStarBE+" "+numberOfStepsInBacktrackingBE);
-            System.out.println(numberOfStepsInAStarBCE+" "+numberOfStepsInBacktrackingBCE);
-            System.out.println(numberOfStepsInAStarCBE+" "+numberOfStepsInBacktrackingCBE);
+//            System.out.println(numberOfStepsInAStarBE+" "+numberOfStepsInBacktrackingBE);
+//            System.out.println(numberOfStepsInAStarBCE+" "+numberOfStepsInBacktrackingBCE);
+//            System.out.println(numberOfStepsInAStarCBE+" "+numberOfStepsInBacktrackingCBE);
             int numOfStepsInBacktrackingBE = numberOfStepsInBacktrackingBE.get();
             int numOfStepsInBacktrackingBCE = numberOfStepsInBacktrackingBCE.get();
             int numOfStepsInBacktrackingCBE = numberOfStepsInBacktrackingCBE.get();
@@ -947,7 +1557,11 @@ public class Main {
                 }
             }
 
-            System.out.println("The shortest way using the Backtracking algorithm takes "+ minBacktrackingVal +" steps.");
+            if (scenario==2) {
+                System.out.println("The shortest way using the Backtracking algorithm with 2nd type of perception takes "+ minBacktrackingVal +" steps.");
+            } else {
+                System.out.println("The shortest way using the Backtracking algorithm with 1st type of perception takes "+ minBacktrackingVal +" steps.");
+            }
             if (minBacktrackingInd == 0) {
                 System.out.println("Path would be Harry -- Book -- Exit:");
                 System.out.println("Harry -> Book:");
@@ -972,7 +1586,11 @@ public class Main {
                 map8.printMap(1);
             }
 
-            System.out.println("The shortest way using the A* algorithm takes "+ minAStarVal +" steps.");
+            if (scenario==2) {
+                System.out.println("The shortest way using the A* algorithm with 2nd type of perception takes "+ minAStarVal +" steps.");
+            } else {
+                System.out.println("The shortest way using the A* algorithm with 1st type of perception takes "+ minAStarVal +" steps.");
+            }
             if (minAStarInd == 0) {
                 System.out.println("Path would be Harry -- Book -- Exit:");
                 System.out.println("Harry -> Book:");
@@ -1002,15 +1620,43 @@ public class Main {
     public static void startGame() {
         Map map = new Map();
 //        map.insertMap(0,0,5,8,2,4,4,0,5,0,7,0);//BE
-//        map.insertMap(0,0, 5, 5,1,2,2,4,8,0,0,8);
-        map.insertMap(0,0, 6, 3,6,7,8,7,8,0,0,8);//CBE
+        map.insertMap(0,0, 5, 5,5,1,2,4,8,0,0,8);
+//        map.insertMap(0,0, 6, 3,2,1,8,7,8,0,0,8);//CBE
+//        map.insertMap(0,0, 4, 4,0,3,2,4,8,0,0,8);
+//        map.insertMap(0,0, 3, 3,0,3,2,4,8,0,0,8);//dead a*
+//        map.insertMap(0,0, 3, 0,0,5,2,4,8,0,0,8);//dead both
+//        map.setSecondTypeOfVisionIsActivated(true);
+//        map.printMap(0);
 //        map.insertMap(0,0, 6, 3,6,7,8,7,8,0,8,8);//lose
 //        map.checkAllReachable(0,0);
-        analyzeAllPossibleOutcomes(map);
+//        try {
+//            map.findWayUsingBacktracking(0,0,8,0,0);
+//            map.findWayUsingAStar(0,0,8,0);
+//        } catch (DeadMoveException e) {
+//            System.out.println(e);
+//        }
+
+//        map.printMap(0);
+        Map mapForScenario2 = new Map();
+        map.copyMap(mapForScenario2);
+        try {
+            analyzeAllPossibleOutcomes(map,1);
+        } catch (DeadMoveExceptionInBackTracking | DeadMoveExceptionInAStar e) {
+            System.out.println(e);
+        }
+        try {
+            analyzeAllPossibleOutcomes_Backtrack(mapForScenario2,2);
+        } catch (DeadMoveExceptionInBackTracking e) {
+            System.out.println(e);
+        } try {
+            analyzeAllPossibleOutcomes_AStar(mapForScenario2, 2);
+        } catch (DeadMoveExceptionInAStar e) {
+            System.out.println(e);
+        }
+
     }
 
     public static void main(String[] args) {
         startGame();
-
     }
 }
