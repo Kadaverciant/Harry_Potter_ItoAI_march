@@ -372,7 +372,7 @@ class Map {
         } else {
             if (grid[first][second].getMoveVal()>10) {
 //                printMap(0);
-                throw new DeadMoveExceptionInAStar("Dead end for A*!!!");
+                throw new DeadMoveExceptionInAStar("Dead end for A* algorithm!");
             } else {
                 for (int i = first-2; i<first+3; i++) {
                     for (int j=second-2; j<second+3; j++) {
@@ -486,14 +486,14 @@ class Map {
                 if (cloakIsActivated) {
                     if (grid[first][second].getTypeOfCell()==flag.Filch
                             || grid[first][second].getTypeOfCell()==flag.Cat) {
-                        throw new DeadMoveExceptionInBackTracking("Dead end in backtrack algorithm!");
+                        throw new DeadMoveExceptionInBackTracking("Dead end for backtrack algorithm!");
                     } else {
                         return (grid[first][second].getTypeOfCell()!=flag.Filch
                                 && grid[first][second].getTypeOfCell()!=flag.Cat && !grid[first][second].isVisited());
                     }
                 } else {
                     if (grid[first][second].getTypeOfCell() == flag.Occupied) {
-                        throw new DeadMoveExceptionInBackTracking("Dead end in backtrack algorithm!");
+                        throw new DeadMoveExceptionInBackTracking("Dead end for backtrack algorithm!");
                     } else {
                         return (grid[first][second].getTypeOfCell() != flag.Occupied && grid[first][second].getTypeOfCell()!=flag.Filch
                                 && grid[first][second].getTypeOfCell()!=flag.Cat && !grid[first][second].isVisited());
@@ -1617,10 +1617,188 @@ public class Main {
         }
     }
 
+    public static boolean isInputValid(int h1, int h2, int f1, int f2, int cat1, int cat2, int b1, int b2, int c1, int c2, int e1, int e2) {
+        ArrayList<Integer> arrayList = new ArrayList<>();
+        arrayList.add(h1);
+        arrayList.add(h2);
+        arrayList.add(b1);
+        arrayList.add(b2);
+        arrayList.add(c1);
+        arrayList.add(c2);
+        arrayList.add(e1);
+        arrayList.add(e2);
+        arrayList.add(f1);
+        arrayList.add(f2);
+        arrayList.add(cat1);
+        arrayList.add(cat2);
+
+        for (int i=0; i<arrayList.size(); i++) {
+            if (arrayList.get(i)<0 || arrayList.get(i)>8)
+                return false;
+        }
+        for (int i=0; i<arrayList.size(); i+=2) {
+            for (int j=0; j<arrayList.size(); j+=2) {
+                if (i!=j) {
+                    if (arrayList.get(i) == arrayList.get(j) && arrayList.get(i+1)==arrayList.get(j+1))
+                        return false;
+                }
+            }
+        }
+        for (int i=0; i<arrayList.size()-4; i+=2) {
+            if (Math.abs(arrayList.get(i) - arrayList.get(10))<2 && Math.abs(arrayList.get(i+1) - arrayList.get(11))<2)
+                return false;
+            if ((Math.abs(arrayList.get(i) - arrayList.get(8))<3) && (Math.abs(arrayList.get(i+1) - arrayList.get(9))<3))
+                return false;
+        }
+        return true;
+    }
+
     public static void startGame() {
-        Map map = new Map();
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.println("Welcome to the Bool finding \"game\"!");
+        System.out.println("Do you want to generate the map or insert the positions of agents manually?");
+        System.out.println("1 - generate the map");
+        System.out.println("2 - insert the map");
+        int firstChoose = scanner.nextInt();
+        while (firstChoose!=1 && firstChoose!=2) {
+            System.out.println("Wrong command - try again");
+            System.out.println("1 - generate the map");
+            System.out.println("2 - insert the map");
+            firstChoose = scanner.nextInt();
+        }
+        System.out.println("What type of perception do you want to use?");
+        System.out.println("1 - first type");
+        System.out.println("2 - second type");
+        System.out.println("3 - both types");
+        int secondChoose = scanner.nextInt();
+        while (secondChoose!=1 && secondChoose!=2 && secondChoose!=3) {
+            System.out.println("Wrong command - try again");
+            System.out.println("1 - first type");
+            System.out.println("2 - second type");
+            System.out.println("3 - both types");
+            secondChoose = scanner.nextInt();
+        }
+        scanner.nextLine();
+
+        if (firstChoose==2) {
+            boolean isValid = false;
+            String[] s= scanner.nextLine().split(" ");
+            Integer[][] numbs = new Integer[6][2];
+            while (!isValid) {
+
+                for (int i = 0; i<s.length; i++) {
+                    numbs[i][0] = Integer.parseInt(s[i].split(",")[0].replace("[",""));
+                    numbs[i][1] = Integer.parseInt(s[i].split(",")[1].replace("]",""));
+                }
+
+                isValid = isInputValid(numbs[0][0], numbs[0][1], numbs[1][0], numbs[1][1], numbs[2][0], numbs[2][1],
+                        numbs[3][0], numbs[3][1], numbs[4][0], numbs[4][1], numbs[5][0], numbs[5][1]);
+                if (!isValid) {
+                    System.out.println("Your input is invalid, please try again:");
+                    s = scanner.nextLine().split(" ");
+                }
+            }
+            Map map = new Map();
+            map.insertMap(numbs[0][0], numbs[0][1], numbs[1][0], numbs[1][1], numbs[2][0], numbs[2][1],
+                    numbs[3][0], numbs[3][1], numbs[4][0], numbs[4][1], numbs[5][0], numbs[5][1]);
+            if (secondChoose == 1) {
+                try {
+                    analyzeAllPossibleOutcomes_Backtrack(map,1);
+                } catch (DeadMoveExceptionInBackTracking e) {
+                    System.out.println("Dead end for backtrack algorithm!");
+                } try {
+                    analyzeAllPossibleOutcomes_AStar(map, 1);
+                } catch (DeadMoveExceptionInAStar e) {
+                    System.out.println("Dead end for A* algorithm!");
+                }
+            } else if (secondChoose == 2) {
+                try {
+                    analyzeAllPossibleOutcomes_Backtrack(map,2);
+                } catch (DeadMoveExceptionInBackTracking e) {
+                    System.out.println("Dead end for backtrack algorithm!");
+                } try {
+                    analyzeAllPossibleOutcomes_AStar(map, 2);
+                } catch (DeadMoveExceptionInAStar e) {
+                    System.out.println("Dead end for A* algorithm!");
+                }
+            } else {
+                try {
+                    analyzeAllPossibleOutcomes_Backtrack(map,1);
+                } catch (DeadMoveExceptionInBackTracking e) {
+                    System.out.println("Dead end for backtrack algorithm!");
+                } try {
+                    analyzeAllPossibleOutcomes_AStar(map, 1);
+                } catch (DeadMoveExceptionInAStar e) {
+                    System.out.println("Dead end for A* algorithm!");
+                }
+
+                Map mapForScenario2 = new Map();
+                map.copyMap(mapForScenario2);
+                try {
+                    analyzeAllPossibleOutcomes_Backtrack(mapForScenario2,2);
+                } catch (DeadMoveExceptionInBackTracking e) {
+                    System.out.println("Dead end for backtrack algorithm!");
+                } try {
+                    analyzeAllPossibleOutcomes_AStar(mapForScenario2, 2);
+                } catch (DeadMoveExceptionInAStar e) {
+                    System.out.println("Dead end for A* algorithm!");
+                }
+            }
+        } else {
+            Map map = new Map();
+            map.generateMap();
+            if (secondChoose == 1) {
+                try {
+                    analyzeAllPossibleOutcomes_Backtrack(map,1);
+                } catch (DeadMoveExceptionInBackTracking e) {
+                    System.out.println("Dead end for backtrack algorithm!");
+                } try {
+                    analyzeAllPossibleOutcomes_AStar(map, 1);
+                } catch (DeadMoveExceptionInAStar e) {
+                    System.out.println("Dead end for A* algorithm!");
+                }
+            } else if (secondChoose == 2) {
+                try {
+                    analyzeAllPossibleOutcomes_Backtrack(map,2);
+                } catch (DeadMoveExceptionInBackTracking e) {
+                    System.out.println("Dead end for backtrack algorithm!");
+                } try {
+                    analyzeAllPossibleOutcomes_AStar(map, 2);
+                } catch (DeadMoveExceptionInAStar e) {
+                    System.out.println("Dead end for A* algorithm!");
+                }
+            } else {
+                try {
+                    analyzeAllPossibleOutcomes_Backtrack(map,1);
+                } catch (DeadMoveExceptionInBackTracking e) {
+                    System.out.println("Dead end for backtrack algorithm!");
+                } try {
+                    analyzeAllPossibleOutcomes_AStar(map, 1);
+                } catch (DeadMoveExceptionInAStar e) {
+                    System.out.println("Dead end for A* algorithm!");
+                }
+
+                Map mapForScenario2 = new Map();
+                map.copyMap(mapForScenario2);
+                try {
+                    analyzeAllPossibleOutcomes_Backtrack(mapForScenario2,2);
+                } catch (DeadMoveExceptionInBackTracking e) {
+                    System.out.println("Dead end for backtrack algorithm!");
+                } try {
+                    analyzeAllPossibleOutcomes_AStar(mapForScenario2, 2);
+                } catch (DeadMoveExceptionInAStar e) {
+                    System.out.println("Dead end for A* algorithm!");
+                }
+            }
+        }
+
+
+
+
+//        Map map = new Map();
 //        map.insertMap(0,0,5,8,2,4,4,0,5,0,7,0);//BE
-        map.insertMap(0,0, 5, 5,5,1,2,4,8,0,0,8);
+//        map.insertMap(0,0, 5, 5,5,1,8,8,2,4,0,8);
 //        map.insertMap(0,0, 6, 3,2,1,8,7,8,0,0,8);//CBE
 //        map.insertMap(0,0, 4, 4,0,3,2,4,8,0,0,8);
 //        map.insertMap(0,0, 3, 3,0,3,2,4,8,0,0,8);//dead a*
@@ -1637,22 +1815,22 @@ public class Main {
 //        }
 
 //        map.printMap(0);
-        Map mapForScenario2 = new Map();
-        map.copyMap(mapForScenario2);
-        try {
-            analyzeAllPossibleOutcomes(map,1);
-        } catch (DeadMoveExceptionInBackTracking | DeadMoveExceptionInAStar e) {
-            System.out.println(e);
-        }
-        try {
-            analyzeAllPossibleOutcomes_Backtrack(mapForScenario2,2);
-        } catch (DeadMoveExceptionInBackTracking e) {
-            System.out.println(e);
-        } try {
-            analyzeAllPossibleOutcomes_AStar(mapForScenario2, 2);
-        } catch (DeadMoveExceptionInAStar e) {
-            System.out.println(e);
-        }
+//        Map mapForScenario2 = new Map();
+//        map.copyMap(mapForScenario2);
+//        try {
+//            analyzeAllPossibleOutcomes(map,1);
+//        } catch (DeadMoveExceptionInBackTracking | DeadMoveExceptionInAStar e) {
+//            System.out.println(e);
+//        }
+//        try {
+//            analyzeAllPossibleOutcomes_Backtrack(mapForScenario2,2);
+//        } catch (DeadMoveExceptionInBackTracking e) {
+//            System.out.println(e);
+//        } try {
+//            analyzeAllPossibleOutcomes_AStar(mapForScenario2, 2);
+//        } catch (DeadMoveExceptionInAStar e) {
+//            System.out.println(e);
+//        }
 
     }
 
