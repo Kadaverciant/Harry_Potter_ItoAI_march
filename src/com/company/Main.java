@@ -3,6 +3,9 @@ package com.company;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * This enumerator is designed to indicate the type of cell on the map.
+ */
 enum flag {
     Harry,
     Filch,
@@ -11,11 +14,18 @@ enum flag {
     Book,
     Exit,
     Empty,
-    Occupied
+    Occupied//under the perception of an observer (Filch or Cat)
 }
 
+/**
+ * This class is created to get values from the Student's distribution table for calculating statistical values.
+ */
 class t_table {
     private double[][] table;
+
+    /**
+     * CLass constructor.
+     */
     t_table() {
         table = new double[][]{
                 { 6.3138,12.7065,31.8193,63.6551,127.3447,318.4930,636.0450,},
@@ -220,64 +230,121 @@ class t_table {
                 { 1.6525,1.9719,2.3451,2.6007,2.8385,3.1315,3.3398,}
         };
     }
+
+    /**
+     * This function returns the corresponding value from the Student's distribution table,
+     * which is determined by the number of degrees of freedom and Confidence level.
+     * @param degreeOfFreedom number of degrees of freedom
+     * @param confidence index for the table, that would show Confidence level:
+     *                   0 - 90% Confidence level
+     *                   1 - 95% Confidence level
+     *                   2 - 98% Confidence level
+     *                   3 - 99% Confidence level
+     *                   4 - 99.5% Confidence level
+     *                   5 - 99.8% Confidence level
+     *                   6 - 99.9% Confidence level
+     * @return the corresponding value from the Student's distribution table
+     */
     public double get_value(int degreeOfFreedom, int confidence) {
         return table[degreeOfFreedom-1][confidence];
     }
 }
 
+/**
+ * This class is designed to use a user-defined exception to control the 2nd type of perception in backtracking
+ * algorithms.
+ */
 class DeadMoveExceptionInBackTracking extends Exception {
     DeadMoveExceptionInBackTracking(String message) {
         super(message);
     }
 }
 
+/**
+ * This class is designed to use a user-defined exception to control the 2nd type of perception in A* algorithms.
+ */
 class DeadMoveExceptionInAStar extends Exception {
     DeadMoveExceptionInAStar(String message) {
         super(message);
     }
 }
 
+/**
+ * This class is created to use the Pair data structure, which is used in solving the problem,
+ * it contains a pair of values of arbitrary types and makes it possible to access each of them separately.
+ * @param <T> type of first element
+ * @param <V> type of second element
+ */
 class Pair<T,V> {
     private T first;
     private V second;
 
+    /**
+     * CLass constructor with initial assignment.
+     */
     public Pair(T firstElement, V secondElement) {
         first = firstElement;
         second = secondElement;
     }
 
+    /**
+     * Getter for the first element in pair.
+     * @return first element in pair
+     */
     public T getFirst() {
         return first;
     }
 
+    /**
+     * Setter for the first element in pair.
+     * @param first element that we want to store as first in pair
+     */
     public void setFirst(T first) {
         this.first = first;
     }
 
+    /**
+     * Getter for the second element in pair.
+     * @return second element in pair
+     */
     public V getSecond() {
         return second;
     }
 
+    /**
+     * Setter for the second element in pair.
+     * @param second element that we want to store as second in pair
+     */
     public void setSecond(V second) {
         this.second = second;
     }
 }
 
+/**
+ * This class is used to store information about a certain cell on the map
+ */
 class Cell {
-    private flag typeOfCell;
-    private int heuristicVal;
-    private int moveVal;
-    private int costVal;
-    private int orderInBackTrack;
-    private int orderInAStar;
-    private boolean calculated;
-    private boolean observedByBacktrack;
-    private boolean visited;
-    private boolean reachable;
-    private boolean observed;
-    private Pair<Integer,Integer> coordinate;
-    private Pair<Integer,Integer> prevCell;
+    private flag typeOfCell;// type of this cell
+    private int heuristicVal;// heuristic value of this cell
+    private int moveVal;// value that shows price of movement on this cell
+    private int costVal;// total cost that influence on our decision of the way in A*
+    private int funcVal;// value that shows number of steps from start position to this cell
+    private int orderInBackTrack;// the order of the cell in the path that was created using the backtracking algorithm
+    private int orderInAStar;// the order of the cell in the path that was created using the A* algorithm
+    private boolean calculated;// shows whether the total cost for this cell was calculated during the A* algorithm
+    private boolean observedByBacktrack;// shows whether this cell was observed by backtracking algorithm
+                                        // with 2nd type of perception
+    private boolean visited;// shows whether this cell was already analysed during backtracking algorithm
+    private boolean reachable;// shows whether the actor can reach this cell
+    private boolean observed;// shows whether this cell was observed by A* algorithm with 2nd type of perception
+    private Pair<Integer,Integer> coordinate;// stores coordinate of the cell in map
+    private Pair<Integer,Integer> prevCell;// stores information for previous cell in path from A* algorithm
 
+    /**
+     * CLass constructor with initial assignment of coordinates.
+     * @param first number of raw in map
+     * @param second number of column in map
+     */
     public Cell(int first, int second) {
         setTypeOfCell(flag.Empty);
         calculated =  false;
@@ -287,74 +354,156 @@ class Cell {
         observedByBacktrack = false;
         this.coordinate = new Pair<>(first,second);
         costVal = 0;
+        funcVal = 0;
         orderInBackTrack = 0;
         orderInAStar = 0;
     }
 
+    /**
+     * Setter for boolean variable that shows whether this cell was observed by backtracking algorithm
+     * with 2nd type of perception.
+     * @param observedByBacktrack boolean value
+     */
     public void setObservedByBacktrack(boolean observedByBacktrack) {
         this.observedByBacktrack = observedByBacktrack;
     }
 
+    /**
+     * Getter for boolean variable that shows whether this cell was observed by backtracking algorithm
+     * with 2nd type of perception.
+     * @return whether this cell was observed by backtracking algorithm with 2nd type of perception
+     */
     public boolean isObservedByBacktrack() {
         return observedByBacktrack;
     }
 
+    /**
+     * Getter for boolean variable that shows whether this cell was observed by A* algorithm
+     * with 2nd type of perception.
+     * @return whether this cell was observed by A* algorithm with 2nd type of perception
+     */
     public boolean isObserved() {
         return observed;
     }
 
+    /**
+     * Setter for boolean variable that shows whether this cell was observed by A* algorithm
+     * with 2nd type of perception.
+     * @param observed boolean value
+     */
     public void setObserved(boolean observed) {
         this.observed = observed;
     }
+
+    /**
+     * Getter for boolean variable that shows whether the actor can reach this cell.
+     * @return whether the actor can reach this cell
+     */
     public boolean isReachable() {
         return reachable;
     }
 
+    /**
+     * Setter for boolean variable that shows whether the actor can reach this cell.
+     * @param reachable boolean value
+     */
     public void setReachable(boolean reachable) {
         this.reachable = reachable;
     }
 
+    /**
+     * Getter for order of cell in the path from A*.
+     * @return order of cell in the path from A*
+     */
     public int getOrderInAStar() {
         return orderInAStar;
     }
 
+    /**
+     * Setter for order of cell in the path from A*.
+     * @param orderInAStar order of cell in the path from A*
+     */
     public void setOrderInAStar(int orderInAStar) {
         this.orderInAStar = orderInAStar;
     }
 
+    /**
+     * Getter for order of cell in the path from backtracking.
+     * @return order of cell in the path from backtracking
+     */
     public int getOrderInBackTrack() {
         return orderInBackTrack;
     }
 
+    /**
+     * Setter for order of cell in the path from backtracking.
+     * @param orderInBackTrack order of cell in the path from backtracking
+     */
     public void setOrderInBackTrack(int orderInBackTrack) {
         this.orderInBackTrack = orderInBackTrack;
     }
+
+    /**
+     * Getter for coordinates of this cell on map
+     * @return pair with coordinates
+     */
     public Pair<Integer, Integer> getCoordinate() {
         return coordinate;
     }
+
+    /**
+     * Getter for boolean variable that shows whether the total cost for this cell was calculated.
+     * @return whether the total cost for this cell was calculated
+     */
     public boolean isCalculated() {
         return calculated;
     }
+
+    /**
+     * Getter for boolean variable that shows whether this cell was analysed during backtracking.
+     * @return whether this cell was analysed during backtracking
+     */
     public boolean isVisited() {
         return visited;
     }
 
+    /**
+     * Setter for boolean variable that shows whether this cell was analysed during backtracking.
+     * @param visited boolean value
+     */
     public void setVisited(boolean visited) {
         this.visited = visited;
     }
 
+    /**
+     * Getter for coordinates of the previous cell in path from A* algorithm.
+     * @return pair with coordinates
+     */
     public Pair<Integer, Integer> getPrevCell() {
         return prevCell;
     }
 
+    /**
+     * Setter for coordinates of the previous cell in path from A* algorithm.
+     * @param first raw number of the previous cell
+     * @param second column number of the previous cell
+     */
     public void setPrevCell(int first, int second) {
         this.prevCell = new Pair<>(first,second);
     }
 
+    /**
+     * Getter for enumerator that shows type of this cell.
+     * @return enumerator
+     */
     public flag getTypeOfCell() {
         return typeOfCell;
     }
 
+    /**
+     * Setter for enumerator that shows type of this cell, which affects the price of movement on this cell.
+     * @return enumerator
+     */
     public void setTypeOfCell(flag typeOfCell) {
         this.typeOfCell = typeOfCell;
         if (typeOfCell==flag.Filch) {
@@ -370,41 +519,81 @@ class Cell {
         }
     }
 
+    /**
+     * Getter for heuristic value of cell.
+     * @return heuristic value of cell
+     */
     public int getHeuristicVal() {
         return heuristicVal;
     }
 
+    /**
+     * Setter for heuristic value of cell.
+     * @param heuristicVal heuristic value of cell
+     */
     public void setHeuristicVal(int heuristicVal) {
         this.heuristicVal = heuristicVal;
     }
 
+    /**
+     * Getter for price of movement on this cell.
+     * @return price of movement on this cell
+     */
     public int getMoveVal() {
         return moveVal;
     }
 
+    /**
+     * Setter for price of movement on this cell.
+     * @param moveVal price of movement on this cell
+     */
     public void setMoveVal(int moveVal) {
         this.moveVal = moveVal;
         costVal = moveVal + heuristicVal;
     }
 
+    /**
+     * Getter for value that shows number of steps from start position to this cell.
+     * @return value that shows number of steps from start position to this cell.
+     */
+    public int getFuncVal() {
+        return funcVal;
+    }
+
+    /**
+     * This function calculate total cost that influence on our decision of the way in A*
+     * @param prevVal number of steps from start position to previous cell
+     */
     public void calculateCostVal(int prevVal) {
         calculated = true;
         costVal = moveVal + heuristicVal + prevVal;
+        funcVal = prevVal + moveVal;
     }
 
+    /**
+     * This function calculate total cost that influence on our decision of the way in A* with 2nd type of perception
+     * if this cell wasn't observed previously.
+     * @param prevVal number of steps from start position to previous cell
+     */
     public void calculateAsUnknown(int prevVal) {
         calculated = true;
         costVal = 1 + heuristicVal + prevVal;
+        funcVal = prevVal + moveVal;
     }
 
+    /**
+     * Getter for value that influence on our decision of the way in A*
+     * @return total cost of the cell
+     */
     public int getCostVal() {
         return costVal;
     }
 }
 
 
-
-
+/**
+ * This class represents a game map, where actions take place. It is a two-dimensional array of cells.
+ */
 class Map {
     private Cell[][] grid;
     public Pair<Integer,Integer> HarryCoordinate;
@@ -413,14 +602,17 @@ class Map {
     public Pair<Integer,Integer> BookCoordinate;
     public Pair<Integer,Integer> CloakCoordinate;
     public Pair<Integer,Integer> ExitCoordinate;
-    private final SortedSet<Cell> cellSet;
+    private final SortedSet<Cell> cellSet;//set which is used as priority que in A*
     private static final int gridSize = 9;
     public Pair<Integer,Integer> reachableBookCoordinate;
     public Pair<Integer,Integer> reachableCloakCoordinate;
     public Pair<Integer,Integer> reachableExitCoordinate;
-    private boolean cloakIsActivated;
-    private boolean secondTypeOfVisionIsActivated;
+    private boolean cloakIsActivated;// shows whether invisible cloak is activated
+    private boolean secondTypeOfVisionIsActivated;// shows whether we consider second type of perception
 
+    /**
+     * Class constructor with initialization of comparator for cells in sorted set, which based on Tree set.
+     */
     public Map() {
         grid = new Cell[gridSize][gridSize];
         for (int i=0; i<gridSize; i++) {
@@ -445,10 +637,19 @@ class Map {
         secondTypeOfVisionIsActivated = false;
     }
 
+    /**
+     * Setter for boolean variable that shows whether we consider second type of perception.
+     * @param secondTypeOfVisionIsActivated boolean value
+     */
     public void setSecondTypeOfVisionIsActivated(boolean secondTypeOfVisionIsActivated) {
         this.secondTypeOfVisionIsActivated = secondTypeOfVisionIsActivated;
     }
 
+    /**
+     * This function activates invisible cloak only if the correct coordinates of the cloak are obtained.
+     * @param first raw number of cell where activation takes place
+     * @param second column number of cell where activation takes place
+     */
     public void activateCloak(int first, int second) {
         if (first == CloakCoordinate.getFirst() && second== CloakCoordinate.getSecond())
             cloakIsActivated =true;
@@ -460,6 +661,12 @@ class Map {
         }
     }
 
+    /**
+     * This function saves the coordinates of the book, exit, or invisibility cloak, if they can be obtained from
+     * a specific cell. It also marks all cells that are reachable from a specific cell.
+     * @param first raw number of cell from which we check availability
+     * @param second column number of cell from which we check availability
+     */
     public void checkAllReachable(int first, int second) {
         SortedSet<Cell> reachableCellSet = new TreeSet<>(new Comparator<Cell>() {
             @Override
@@ -497,6 +704,10 @@ class Map {
         }
     }
 
+    /**
+     * This function removes all marks from reachable cells and deletes information about the coordinates of the book,
+     * exit, and invisibility cloak, that were reachable.
+     */
     public void resetAllReachable() {
         for (int i = 0; i<gridSize; i++) {
             for (int j=0; j<gridSize; j++) {
@@ -508,25 +719,44 @@ class Map {
         reachableCloakCoordinate = new Pair<>(-1,-1);
     }
 
+    /**
+     * This function shows whether we have coordinates of book, which obtained from function allReachable().
+     * @return true if we can we have coordinates of book, which obtained from function allReachable()
+     */
     public boolean isBookReachable() {
         return (reachableBookCoordinate.getFirst()!=-1 && reachableBookCoordinate.getSecond()!=-1);
     }
 
+    /**
+     * This function shows whether we have coordinates of exit, which obtained from function allReachable().
+     * @return true if we can we have coordinates of book, which obtained from function allReachable()
+     */
     public boolean isExitReachable() {
         return (reachableExitCoordinate.getFirst()!=-1 && reachableExitCoordinate.getSecond()!=-1);
     }
 
+    /**
+     * This function shows whether we have coordinates of invisible cloak, which obtained from function allReachable().
+     * @return true if we can we have coordinates of book, which obtained from function allReachable()
+     */
     public boolean isCloakReachable() {
         return (reachableCloakCoordinate.getFirst()!=-1 && reachableCloakCoordinate.getSecond()!=-1);
     }
 
+    /**
+     * This function adds new cells to the sorted set that were not previously used when constructing the path
+     * in the A* algorithm. It removes the cell with the lowest total cost from the sorted set and checks its neighbors.
+     * @param first raw number of cell which we want to add in set
+     * @param second column number of cell which we want to add in set
+     * @throws DeadMoveExceptionInAStar
+     */
     private void addCellsInSet(int first, int second) throws DeadMoveExceptionInAStar {
         cellSet.remove(cellSet.first());
         if (!secondTypeOfVisionIsActivated) {
             for(int i=first-1; i<first+2; i++) {
                 for(int j=second-1; j<second+2; j++) {
                     if (i>-1 && i<gridSize && j>-1 && j<gridSize && !grid[i][j].isCalculated()) {
-                        grid[i][j].calculateCostVal(grid[first][second].getCostVal());
+                        grid[i][j].calculateCostVal(grid[first][second].getFuncVal());
                         grid[i][j].setPrevCell(first,second);
                         cellSet.add(grid[i][j]);
                     }
@@ -548,10 +778,10 @@ class Map {
                                     if (f != -1 && s != -1) {
                                         if (cellSet.contains(grid[i][j])){
                                             cellSet.remove( grid[i][j]);
-                                            grid[i][j].calculateCostVal(grid[f][s].getCostVal());
+                                            grid[i][j].calculateCostVal(grid[f][s].getFuncVal());
                                             cellSet.add(grid[i][j]);
                                         } else {
-                                            grid[i][j].calculateCostVal(grid[f][s].getCostVal());
+                                            grid[i][j].calculateCostVal(grid[f][s].getFuncVal());
                                         }
                                     }
                                 }
@@ -561,11 +791,11 @@ class Map {
                 for(int i=first-1; i<first+2; i++) {
                     for(int j=second-1; j<second+2; j++) {
                         if (i>-1 && i<gridSize && j>-1 && j<gridSize && grid[i][j].isObserved() && !grid[i][j].isCalculated()) {
-                            grid[i][j].calculateCostVal(grid[first][second].getCostVal());
+                            grid[i][j].calculateCostVal(grid[first][second].getFuncVal());
                             grid[i][j].setPrevCell(first,second);
                             cellSet.add(grid[i][j]);
                         } else  if (i>-1 && i<gridSize && j>-1 && j<gridSize && !grid[i][j].isObserved() && !grid[i][j].isCalculated()) {
-                            grid[i][j].calculateAsUnknown(grid[first][second].getCostVal());
+                            grid[i][j].calculateAsUnknown(grid[first][second].getFuncVal());
                             grid[i][j].setPrevCell(first,second);
                             cellSet.add(grid[i][j]);
                         }
@@ -575,20 +805,26 @@ class Map {
         }
     }
 
+    /**
+     * This function is creating a path from one cell to another using A* algorithm.
+     * @param firstS raw number of initial cell
+     * @param secondS column number of initial cell
+     * @param firstE raw number of target cell
+     * @param secondE column number of target cell
+     * @throws DeadMoveExceptionInAStar exception that is thrown if actor with 2nd type of perception dies
+     */
     public void findWayUsingAStar(int firstS, int secondS, int firstE, int secondE) throws DeadMoveExceptionInAStar {
         for (int i=0; i<gridSize; i++) {
             for (int j=0 ; j<gridSize; j++) {
                 grid[i][j].setHeuristicVal(Math.max( Math.abs(i-firstE),  Math.abs(j-secondE)));
             }
         }
-//        printMap(0);
         grid[firstS][secondS].calculateCostVal(0);
         grid[firstS][secondS].setPrevCell(-1,-1);
         cellSet.add(grid[firstS][secondS]);
         addCellsInSet(firstS,secondS);
 
         while (cellSet.first().getCoordinate().getFirst() != firstE || cellSet.first().getCoordinate().getSecond() != secondE ) {
-            //cellSet.remove(cellSet.first());
             addCellsInSet(cellSet.first().getCoordinate().getFirst(), cellSet.first().getCoordinate().getSecond());
         }
         ArrayList<Pair<Integer,Integer>> way = new ArrayList<>();
@@ -600,10 +836,16 @@ class Map {
         }
         for (int i=way.size()-1; i>= 0; i--) {
             grid[way.get(i).getFirst()][way.get(i).getSecond()].setOrderInAStar(way.size()-i);
-//            System.out.println(way.get(i).getFirst()+" "+way.get(i).getSecond());
         }
     }
 
+    /**
+     * This function checks whether the decided cell in backtracking algorithm is safe or already visited.
+     * @param first raw number of checked cell
+     * @param second column number of checked cell
+     * @return true if cell is safe and unvisited
+     * @throws DeadMoveExceptionInBackTracking exception that is thrown if actor with 2nd type of perception dies
+     */
     private boolean cellIsSafe(int first, int second) throws DeadMoveExceptionInBackTracking {
         if (!secondTypeOfVisionIsActivated) {
             if (first>-1 && second>-1 && first<gridSize && second<gridSize) {
@@ -657,6 +899,16 @@ class Map {
         }
     }
 
+    /**
+     * This function is creating a path from one cell to another using Backtracking algorithm.
+     * @param firstS raw number of initial cell
+     * @param secondS column number of initial cell
+     * @param firstE raw number of target cell
+     * @param secondE column number of target cel
+     * @param orderInBacktrack order of cell in backtracking path
+     * @return true if path from one cell to another exists
+     * @throws DeadMoveExceptionInBackTracking exception that is thrown if actor with 2nd type of perception dies
+     */
     public boolean findWayUsingBacktracking(int firstS, int secondS, int firstE, int secondE, int orderInBacktrack) throws DeadMoveExceptionInBackTracking {
         if (orderInBacktrack==0 && secondTypeOfVisionIsActivated) {
             for (int i = firstS-2; i<firstS+3; i++) {
@@ -750,15 +1002,31 @@ class Map {
         }
     }
 
+    /**
+     * Getter for cell that is located in certain coordinates in map.
+     * @param i raw number of requested cell
+     * @param j column number of requested cell
+     * @return instance of cell with such coordinates
+     */
     public Cell getCell(int i, int j) {
         return grid[i][j];
     }
 
-    public void setHarry() {
-        HarryCoordinate = new Pair<>(0,0);
+    /**
+     * This function set Harry in certain cell.
+     * @param first raw number of cell where Harry would be located
+     * @param second column number of cell where Harry would be located
+     */
+    public void setHarry(int first, int second) {
+        HarryCoordinate = new Pair<>(first,second);
         grid[HarryCoordinate.getFirst()][HarryCoordinate.getSecond()].setTypeOfCell(flag.Harry);
     }
 
+    /**
+     * This function set Filch in certain cell and mark all cells in range of 2 cells as occupied.
+     * @param first raw number of cell where Filch would be located
+     * @param second column number of cell where Filch would be located
+     */
     public void setFilch(int first, int second) {
         FilchCoordinate = new Pair<>(first,second);
         grid[first][second].setTypeOfCell(flag.Filch);
@@ -772,6 +1040,11 @@ class Map {
         }
     }
 
+    /**
+     * This function set Cat in certain cell and mark all cells in range of 1 cell as occupied.
+     * @param first raw number of cell where Cat would be located
+     * @param second column number of cell where Cat would be located
+     */
     public void setCat(int first, int second) {
         CatCoordinate = new Pair<>(first,second);
         grid[first][second].setTypeOfCell(flag.Cat);
@@ -785,24 +1058,43 @@ class Map {
         }
     }
 
+    /**
+     * This function set Book in certain cell.
+     * @param first raw number of cell where Book would be located
+     * @param second column number of cell where Book would be located
+     */
     private void setBook(int first, int second) {
         BookCoordinate = new Pair<>(first,second);
         grid[first][second].setTypeOfCell(flag.Book);
     }
 
+    /**
+     * This function set Invisible Cloak in certain cell.
+     * @param first raw number of cell where Invisible Cloak would be located
+     * @param second column number of cell where Invisible Cloak would be located
+     */
     private void setCloak(int first, int second) {
         CloakCoordinate = new Pair<>(first,second);
         grid[first][second].setTypeOfCell(flag.Cloak);
     }
 
+    /**
+     * This function set Exit in certain cell.
+     * @param first raw number of cell where Exit would be located
+     * @param second column number of cell where Exit would be located
+     */
     private void setExit(int first, int second) {
         ExitCoordinate = new Pair<>(first,second);
         grid[first][second].setTypeOfCell(flag.Exit);
     }
 
+    /**
+     * This function generate coordinates for Harry, Filch, Cat, Book, Invisible Cloak and Exit and call set functions
+     * for them.
+     */
     public void generateMap() {
         Random rnd = new Random();
-        setHarry();
+        setHarry(0,0);
 
         boolean notSuitable = true;
         int first = 0;
@@ -872,8 +1164,23 @@ class Map {
         setExit(first,second);
     }
 
+    /**
+     * This function invokes setters for Harry, Filch, Cat, Book, Invisible Cloak and Exit with certain coordinates.
+     * @param h1 raw number of cell where Harry would be located
+     * @param h2 column number of cell where Harry would be located
+     * @param f1 raw number of cell where Filch would be located
+     * @param f2 column number of cell where Filch would be located
+     * @param cat1 raw number of cell where Cat would be located
+     * @param cat2 column number of cell where Cat would be located
+     * @param b1 raw number of cell where Book would be located
+     * @param b2 column number of cell where Book would be located
+     * @param c1 raw number of cell where Invisible Cloak would be located
+     * @param c2 column number of cell where Invisible Cloak would be located
+     * @param e1 raw number of cell where Exit would be located
+     * @param e2 column number of cell where Exit would be located
+     */
     public void insertMap(int h1, int h2, int f1, int f2, int cat1, int cat2, int b1, int b2, int c1, int c2, int e1, int e2) {
-        setHarry();
+        setHarry(h1,h2);
         setFilch(f1,f2);
         setCat(cat1,cat2);
         setBook(b1,b2);
@@ -881,6 +1188,11 @@ class Map {
         setExit(e1,e2);
     }
 
+    /**
+     * Set Harry, Filch, Cat, Book, Invisible Cloak and Exit at the same coordinates in received map as in current map.
+     * It also activates cloak in received map if it already activated in current map.
+     * @param someMap map where we want to copy coordinates of Harry, Filch, Cat, Book, Invisible Cloak and Exit
+     */
     public void copyMap(Map someMap) {
         someMap.insertMap(HarryCoordinate.getFirst(),HarryCoordinate.getSecond(),
                 FilchCoordinate.getFirst(), FilchCoordinate.getSecond(),
@@ -893,6 +1205,11 @@ class Map {
         someMap.setSecondTypeOfVisionIsActivated(secondTypeOfVisionIsActivated);
     }
 
+    /**
+     * Mark all as observed by A* or backtracking algorithms from the received map.
+     * @param someMap map from which we want to copy all marked cells which were observed by A* or backtracking
+     *                in current map
+     */
     public void copyAllObserved(Map someMap) {
         for (int i=0; i<gridSize; i++) {
             for (int j=0; j<gridSize; j++) {
@@ -902,6 +1219,12 @@ class Map {
         }
     }
 
+    /**
+     * this function prints map in console. Depending on the parameter it prints backtracking or A* view of the map.
+     * @param style parameter depending on which we decide to print the backtracking or A* map view:
+     *              1 - backtracking view
+     *              2 - A* view
+     */
     public void printMap(int style) {
         System.out.println("-------------------------------------------------------------------------");
         if (style == 0) {
@@ -1070,6 +1393,14 @@ class Map {
 
 public class Main {
 
+    /**
+     * This function calculates how many steps it takes to go from Harry to the Book and then to Exit using
+     * backtracking algorithm.
+     * @param map1 map for first part of the way: from Harry to the Book
+     * @param map2 map for second part of the way: from Book to the Exit
+     * @param numberOfStepsInBacktrack variable in which the number of steps in the path will be stored
+     * @throws DeadMoveExceptionInBackTracking exception that is thrown if actor with 2nd type of perception dies
+     */
     public static void calculateWayBE_Backtrack(Map map1, Map map2, AtomicInteger numberOfStepsInBacktrack) throws DeadMoveExceptionInBackTracking {
         map1.checkAllReachable(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond());
         map1.findWayUsingBacktracking(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
@@ -1087,6 +1418,13 @@ public class Main {
                 map2.getCell(fp2,sp2).getOrderInBackTrack()-1);
     }
 
+    /**
+     * This function calculates how many steps it takes to go from Harry to the Book and then to Exit using A* algorithm.
+     * @param map1 map for first part of the way: from Harry to the Book
+     * @param map2 map for second part of the way: from Book to the Exit
+     * @param numberOfStepsInAStar variable in which the number of steps in the path will be stored
+     * @throws DeadMoveExceptionInAStar exception that is thrown if actor with 2nd type of perception dies
+     */
     public static void calculateWayBE_AStar(Map map1, Map map2, AtomicInteger numberOfStepsInAStar) throws DeadMoveExceptionInAStar {
         map1.checkAllReachable(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond());
         map1.findWayUsingAStar(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
@@ -1104,6 +1442,15 @@ public class Main {
                 map2.getCell(fp2,sp2).getOrderInAStar()-1);
     }
 
+    /**
+     * This function calculates how many steps it takes to go from Harry to the Book, from Book to Invisible Cloak,
+     * and then from Invisible Cloak to Exit using backtracking algorithm.
+     * @param map1 map for first part of the way: from Harry to the Book
+     * @param map2 map for second part of the way: from Book to the Invisible Cloak
+     * @param map3 map for third part of the way: from Invisible Cloak to the Exit
+     * @param numberOfStepsInBacktrack variable in which the number of steps in the path will be stored
+     * @throws DeadMoveExceptionInBackTracking exception that is thrown if actor with 2nd type of perception dies
+     */
     public static void calculateWayBCE_Backtrack(Map map1, Map map2, Map map3, AtomicInteger numberOfStepsInBacktrack) throws DeadMoveExceptionInBackTracking {
         map1.checkAllReachable(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond());
         map1.findWayUsingBacktracking(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
@@ -1129,6 +1476,15 @@ public class Main {
                 map3.getCell(fp3,sp3).getOrderInBackTrack()-1);
     }
 
+    /**
+     * This function calculates how many steps it takes to go from Harry to the Book, from Book to Invisible Cloak,
+     * and then from Invisible Cloak to Exit using A* algorithm.
+     * @param map1 map for first part of the way: from Harry to the Book
+     * @param map2 map for second part of the way: from Book to the Invisible Cloak
+     * @param map3 map for third part of the way: from Invisible Cloak to the Exit
+     * @param numberOfStepsInAStar variable in which the number of steps in the path will be stored
+     * @throws DeadMoveExceptionInAStar exception that is thrown if actor with 2nd type of perception dies
+     */
     public static void calculateWayBCE_AStar(Map map1, Map map2, Map map3, AtomicInteger numberOfStepsInAStar) throws DeadMoveExceptionInAStar {
         map1.checkAllReachable(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond());
         map1.findWayUsingAStar(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
@@ -1154,6 +1510,15 @@ public class Main {
                 map3.getCell(fp3,sp3).getOrderInAStar()-1);
     }
 
+    /**
+     * This function calculates how many steps it takes to go from Harry to the Invisible Cloak,
+     * from Invisible Cloak to Book, and then from Book to Exit using backtracking algorithm.
+     * @param map1 map for first part of the way: from Harry to the Invisible Cloak
+     * @param map2 map for second part of the way: from Invisible Cloak to the Book
+     * @param map3 map for third part of the way: from Book to the Exit
+     * @param numberOfStepsInBacktrack variable in which the number of steps in the path will be stored
+     * @throws DeadMoveExceptionInBackTracking exception that is thrown if actor with 2nd type of perception dies
+     */
     public static void calculateWayCBE_Backtrack(Map map1, Map map2, Map map3, AtomicInteger numberOfStepsInBacktrack) throws DeadMoveExceptionInBackTracking {
         map1.checkAllReachable(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond());
         map1.findWayUsingBacktracking(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
@@ -1180,6 +1545,15 @@ public class Main {
                 map3.getCell(fp3,sp3).getOrderInBackTrack()-1);
     }
 
+    /**
+     * This function calculates how many steps it takes to go from Harry to the Invisible Cloak,
+     * from Invisible Cloak to Book, and then from Book to Exit using A* algorithm.
+     * @param map1 map for first part of the way: from Harry to the Invisible Cloak
+     * @param map2 map for second part of the way: from Invisible Cloak to the Book
+     * @param map3 map for third part of the way: from Book to the Exit
+     * @param numberOfStepsInAStar variable in which the number of steps in the path will be stored
+     * @throws DeadMoveExceptionInAStar exception that is thrown if actor with 2nd type of perception dies
+     */
     public static void calculateWayCBE_AStar(Map map1, Map map2, Map map3, AtomicInteger numberOfStepsInAStar) throws  DeadMoveExceptionInAStar {
         map1.checkAllReachable(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond());
         map1.findWayUsingAStar(map1.HarryCoordinate.getFirst(), map1.HarryCoordinate.getSecond(),
@@ -1206,6 +1580,17 @@ public class Main {
                 map3.getCell(fp3,sp3).getOrderInAStar()-1);
     }
 
+    /**
+     * This function compare all 3 routs (Harry -- Book -- Exit, Harry -- Book -- Invisible Cloak -- Exit,
+     * and Harry -- Invisible Cloak -- Book -- Exit if they exist) that were produced with help of backtracking algorithm
+     * and print the information about the rout that takes the least amount of steps and time spent on execution,
+     * or "You lose!" if there is no way to finish the task.
+     * @param map map on which algorithm build routs
+     * @param scenario parameter depending on which we decide whether should we consider case with 2nd type of perception:
+     *                 1 - use 1st type of perception
+     *                 2 - use 2nd type of perception
+     * @throws DeadMoveExceptionInBackTracking exception that is thrown if actor with 2nd type of perception dies
+     */
     public static void analyzeAllPossibleOutcomes_Backtrack(Map map, int scenario) throws DeadMoveExceptionInBackTracking {
         if (scenario==2)
             map.setSecondTypeOfVisionIsActivated(true);
@@ -1345,6 +1730,18 @@ public class Main {
         }
     }
 
+    /**
+     * This function compare all 3 routs (Harry -- Book -- Exit, Harry -- Book -- Invisible Cloak -- Exit,
+     * and Harry -- Invisible Cloak -- Book -- Exit if they exist) that were produced with help of backtracking algorithm
+     * and pass the least amount of steps from 3 routs and time spent on execution, or 0 if there is no way
+     * to finish the task. This Information goes to statistic analysis.
+     * @param map map on which algorithm build routs
+     * @param scenario parameter depending on which we decide whether should we consider case with 2nd type of perception:
+     *                 1 - use 1st type of perception
+     *                 2 - use 2nd type of perception
+     * @return pair that contains the least amount of steps from 3 routs and time spent on execution
+     * @throws DeadMoveExceptionInBackTracking exception that is thrown if actor with 2nd type of perception dies
+     */
     public static Pair<Integer,Long> analyzeAllPossibleOutcomes_Backtrack_withoutPrinting(Map map, int scenario) throws DeadMoveExceptionInBackTracking {
         if (scenario==2)
             map.setSecondTypeOfVisionIsActivated(true);
@@ -1451,6 +1848,17 @@ public class Main {
         return new Pair<>(0, (long) 0);
     }
 
+    /**
+     * This function compare all 3 routs (Harry -- Book -- Exit, Harry -- Book -- Invisible Cloak -- Exit,
+     * and Harry -- Invisible Cloak -- Book -- Exit if they exist) that were produced with help of A* algorithm and
+     * print the information about the rout that takes the least amount of steps and time spent on execution,
+     * or "You lose!" if there is no way to finish the task.
+     * @param map map on which algorithm build routs
+     * @param scenario parameter depending on which we decide whether should we consider case with 2nd type of perception:
+     *                 1 - use 1st type of perception
+     *                 2 - use 2nd type of perception
+     * @throws DeadMoveExceptionInAStar exception that is thrown if actor with 2nd type of perception dies
+     */
     public static void analyzeAllPossibleOutcomes_AStar(Map map, int scenario) throws DeadMoveExceptionInAStar {
         if (scenario==2)
             map.setSecondTypeOfVisionIsActivated(true);
@@ -1588,6 +1996,18 @@ public class Main {
         }
     }
 
+    /**
+     * This function compare all 3 routs (Harry -- Book -- Exit, Harry -- Book -- Invisible Cloak -- Exit,
+     * and Harry -- Invisible Cloak -- Book -- Exit if they exist) that were produced with help of A* algorithm
+     * and pass the least amount of steps from 3 routs and time spent on execution, or 0 if there is no way
+     * to finish the task. This Information goes to statistic analysis.
+     * @param map map on which algorithm build routs
+     * @param scenario parameter depending on which we decide whether should we consider case with 2nd type of perception:
+     *                 1 - use 1st type of perception
+     *                 2 - use 2nd type of perception
+     * @return pair that contains the least amount of steps from 3 routs and time spent on execution
+     * @throws DeadMoveExceptionInAStar exception that is thrown if actor with 2nd type of perception dies
+     */
     public static Pair<Integer,Long> analyzeAllPossibleOutcomes_AStar_withoutPrinting(Map map, int scenario) throws DeadMoveExceptionInAStar {
         if (scenario==2)
             map.setSecondTypeOfVisionIsActivated(true);
@@ -1694,6 +2114,22 @@ public class Main {
         return new Pair<>(0, (long) 0);
     }
 
+    /**
+     * This function checks the validity of inserted coordinates.
+     * @param h1 raw number of cell where Harry would be located
+     * @param h2 column number of cell where Harry would be located
+     * @param f1 raw number of cell where Filch would be located
+     * @param f2 column number of cell where Filch would be located
+     * @param cat1 raw number of cell where Cat would be located
+     * @param cat2 column number of cell where Cat would be located
+     * @param b1 raw number of cell where Book would be located
+     * @param b2 column number of cell where Book would be located
+     * @param c1 raw number of cell where Invisible Cloak would be located
+     * @param c2 column number of cell where Invisible Cloak would be located
+     * @param e1 raw number of cell where Exit would be located
+     * @param e2 column number of cell where Exit would be located
+     * @return true if all coordinates are valid according to task description
+     */
     public static boolean isInputValid(int h1, int h2, int f1, int f2, int cat1, int cat2, int b1, int b2, int c1, int c2, int e1, int e2) {
         ArrayList<Integer> arrayList = new ArrayList<>();
         arrayList.add(h1);
@@ -1730,6 +2166,9 @@ public class Main {
         return true;
     }
 
+    /**
+     * This function works with user.
+     */
     public static void startGame() {
         Scanner scanner = new Scanner(System.in);
 
@@ -1747,14 +2186,7 @@ public class Main {
             firstChoose = scanner.nextInt();
         }
         if (firstChoose==3) {
-            System.out.println("Statistics for Backtracking algorithm with 1st type of perception:");
-            printStatisticalAnalysis(1,1);
-            System.out.println("Statistics for Backtracking algorithm with 2nd type of perception:");
-            printStatisticalAnalysis(1,2);
-            System.out.println("Statistics for A* algorithm with 1st type of perception:");
-            printStatisticalAnalysis(2,1);
-            System.out.println("Statistics for A* algorithm with 2nd type of perception:");
-            printStatisticalAnalysis(2,2);
+            printStatisticalAnalysis();
         } else {
             System.out.println("What type of perception do you want to use?");
             System.out.println("1 - first type");
@@ -1884,27 +2316,37 @@ public class Main {
         }
     }
 
-    public static void printStatisticalAnalysis(int algorithm, int typeOfVision) {
+    /**
+     * This function calculates and prints statistical parameters for given maps for specific algorithm with certain
+     * type of perception.
+     * @param maps given map
+     * @param mapsForSecondScenario copy of given map for 2nd type of perception
+     * @param algorithm this parameter tells what algorithm we want to analyse:
+     *                  1 - backtracking algorithm
+     *                  2 - A* algorithm
+     * @param typeOfVision this parameter tells what type of perception we want to consider:
+     *                  1 - 1st type of perception
+     *=                 2 - 2nd type of perception
+     * @param numberOfExperiments number of conducted experiments
+     */
+    public static void calculateValuesForAnalysis(Map[] maps, Map[] mapsForSecondScenario, int algorithm, int typeOfVision, int numberOfExperiments) {
         ArrayList<Integer> numberOfSteps = new ArrayList<>();
         ArrayList<Long> numberOfMilliseconds = new ArrayList<>();
         int maxNumOfSteps=0;
         int numOfWins=0;
         long maxValOfMilliseconds=0;
-        int numberOfExperiments = 1000;
-        System.out.println("Number of conducted experiments is "+numberOfExperiments);
+
         for (int i=0; i<numberOfExperiments; i++) {
-            Map map = new Map();
-            map.generateMap();
             try {
                 Pair<Integer, Long> answer = new Pair<>(0,(long) 0);
                 if (algorithm==1 && typeOfVision==1) {
-                    answer = analyzeAllPossibleOutcomes_Backtrack_withoutPrinting(map, 1);
+                    answer = analyzeAllPossibleOutcomes_Backtrack_withoutPrinting(maps[i], 1);
                 } else if (algorithm==1 && typeOfVision==2) {
-                    answer = analyzeAllPossibleOutcomes_Backtrack_withoutPrinting(map, 2);
+                    answer = analyzeAllPossibleOutcomes_Backtrack_withoutPrinting(mapsForSecondScenario[i], 2);
                 } else if (algorithm==2 && typeOfVision==1) {
-                    answer = analyzeAllPossibleOutcomes_AStar_withoutPrinting(map, 1);
+                    answer = analyzeAllPossibleOutcomes_AStar_withoutPrinting(maps[i], 1);
                 } else if (algorithm==2 && typeOfVision==2) {
-                    answer = analyzeAllPossibleOutcomes_AStar_withoutPrinting(map, 2);
+                    answer = analyzeAllPossibleOutcomes_AStar_withoutPrinting(mapsForSecondScenario[i], 2);
                 }
 
                 int first = answer.getFirst();
@@ -1986,6 +2428,32 @@ public class Main {
         double rightBorderForMilliseconds = meanForMilliseconds + vForMilliseconds;
         System.out.println("Calculated mean number of milliseconds is "+meanForMilliseconds);
         System.out.println();
+    }
+
+    /**
+     * This function prints statistical analysis for both algorithms and types of perception.
+     */
+    public static void printStatisticalAnalysis() {
+
+        int numberOfExperiments = 10000;
+        System.out.println("Number of conducted experiments is "+numberOfExperiments);
+        Map[] maps = new Map[numberOfExperiments];
+        Map[] mapsForSecondScenario = new Map[numberOfExperiments];
+        for (int i=0; i<numberOfExperiments; i++) {
+            maps[i]=new Map();
+            mapsForSecondScenario[i]=new Map();
+            maps[i].generateMap();
+            maps[i].copyMap(mapsForSecondScenario[i]);
+        }
+        System.out.println("Statistics for Backtracking algorithm with 1st type of perception:");
+        calculateValuesForAnalysis(maps,mapsForSecondScenario,1,1,numberOfExperiments);
+        System.out.println("Statistics for Backtracking algorithm with 2nd type of perception:");
+        calculateValuesForAnalysis(maps,mapsForSecondScenario,1,2,numberOfExperiments);
+        System.out.println("Statistics for A* algorithm with 1st type of perception:");
+        calculateValuesForAnalysis(maps,mapsForSecondScenario,2,1,numberOfExperiments);
+        System.out.println("Statistics for A* algorithm with 2nd type of perception:");
+        calculateValuesForAnalysis(maps,mapsForSecondScenario,2,2,numberOfExperiments);
+
     }
 
     public static void main(String[] args) {
